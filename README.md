@@ -1,11 +1,12 @@
-# Fujitsu Esprimo Q556/2 - Auxiliary Hackintosh Tool
+# OpenHackintosh
 
 ![Status](https://img.shields.io/badge/Status-Real%20Files-success)
 ![OpenCore](https://img.shields.io/badge/OpenCore-1.0.1+-blue)
 ![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey)
-![Hardware](https://img.shields.io/badge/Hardware-Q556%2F2%20%7C%20Q957-orange)
+![Hardware](https://img.shields.io/badge/Hardware-Q556%2F2%20%7C%20Q957%20%7C%20Generic-orange)
+![License](https://img.shields.io/badge/License-MIT-green)
 
-Tool ausiliario che **automatizza tutta la procedura di Hackintosh** per Fujitsu Esprimo Q556/2 e Q957, generando automaticamente cartelle EFI **REALI e funzionanti** (non finte/vuote).
+**OpenHackintosh** - Tool ausiliario universale per Hackintosh che automatizza la creazione di EFI **REALI e funzionanti** (non finte/vuote). Inizialmente sviluppato per Fujitsu Esprimo Q556/2, ora espanso come toolkit generico.
 
 > **Problema risolto**: I tool precedenti generavano la struttura EFI ma i file erano vuoti/quasi finti. Questo tool scarica file REALI da GitHub ufficiale (Acidanthera, Dortania, etc).
 
@@ -17,7 +18,9 @@ Tool ausiliario che **automatizza tutta la procedura di Hackintosh** per Fujitsu
 - **SSDT REALI**: PLUG, EC-USBX, AWAC, PMC scaricati da Dortania
 - **Config.plist** generato correttamente seguendo la guida Dortania Skylake Desktop
 
-### 🎯 Supporto Hardware Specifico Q556/2
+### 🎯 Supporto Hardware
+
+#### Fujitsu Esprimo Q556/2 (Profilo Principale)
 - **Board**: D3403-U
 - **Chipset**: Intel H110
 - **CPU**: Intel 6th Gen Skylake (i3/i5/i7-6xxxT) e 7th Gen Kaby Lake
@@ -25,6 +28,10 @@ Tool ausiliario che **automatizza tutta la procedura di Hackintosh** per Fujitsu
 - **LAN**: Realtek RTL8111GN (Q556/2) / Intel I219 (Q957)
 - **Audio**: Realtek ALC671 (layout-id 11, 13, 15, 21, 27, 28)
 - **BIOS**: AMI Aptio V - con guida per impostazioni critiche
+
+#### Altri Hardware (Espandibile)
+- Framework per aggiungere nuovi profili (Q957 già incluso)
+- Supporto generico Skylake, Kaby Lake, Coffee Lake
 
 ### 🚀 Funzionalità
 - Generazione EFI one-click
@@ -54,8 +61,8 @@ La GUI moderna mostra:
 
 ### Setup
 ```bash
-git clone https://github.com/andreapieri151-afk/Fujistu-esprimo-q556-2-auxiliarty-tool
-cd Fujistu-esprimo-q556-2-auxiliarty-tool
+git clone https://github.com/andreapieri151-afk/OpenHackintosh.git
+cd OpenHackintosh
 
 # Installa dipendenze
 pip install -r requirements.txt
@@ -259,11 +266,13 @@ Il tool gestisce automaticamente lo swap.
 - [x] CLI completo
 - [x] Web Dashboard
 - [x] Validazione EFI
+- [x] Rinominato OpenHackintosh (tool universale)
 - [ ] Integrazione macserial nativo
 - [ ] USB mapping automatico
 - [ ] OCAT integration
 - [ ] Auto-update kexts
 - [ ] Creazione installer USB automatica
+- [ ] Supporto più hardware generico
 
 ## 🤝 Crediti
 
@@ -293,7 +302,9 @@ MIT License - Vedi LICENSE file
 
 ---
 
-**Made with ❤️ for Fujitsu Esprimo Q556/2 community**
+**Made with ❤️ for Hackintosh community**
 
 > Prima: EFI con file vuoti/finti che non bootano
 > Ora: EFI REALI con download ufficiali che funzionano
+
+**OpenHackintosh** - Da Q556/2 a tool universale
