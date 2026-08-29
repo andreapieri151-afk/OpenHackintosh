@@ -1,194 +1,129 @@
-# BIOS Guide per Fujitsu Esprimo Q556/2 Hackintosh
+# Guida BIOS per Q556/2 - Senza di questa non boota manco per miracolo
 
-## Accesso BIOS
+Ok, questa è la parte più pallosa ma più importante. Se sbagli qui, puoi avere l'EFI più bella del mondo ma non boota.
 
-- Premi `F2` all'avvio (logo Fujitsu)
-- Oppure `F12` per boot menu
+Te lo dico per esperienza: ho passato un pomeriggio a pensare che l'EFI fosse sbagliata, invece avevo Secure Boot attivo.
 
-## Versione BIOS
+## Come entrare nel BIOS
 
-- Tipo: AMI Aptio V
-- Aggiorna all'ultima versione da Fujitsu support
-- Versione consigliata: V5.0.0.11 o superiore
+Accendi il PC, appena vedi il logo Fujitsu spamma **F2** come se non ci fosse un domani. Se non entra, prova F12 per boot menu, poi da lì vai in BIOS.
 
-## Impostazioni CRITICHE
+Se proprio non entra: togli l'SSD/HDD e accendi senza, a volte così entra più facile.
 
-### 1. DVMT Pre-Allocated (FONDAMENTALE)
+## La cosa più importante: DVMT Pre-Allocated
 
-**Percorso**: Advanced → Graphics Configuration → DVMT Pre-Allocated
+### Cos'è?
+È quanta RAM la scheda madre riserva alla grafica integrata (HD 530). macOS ne vuole almeno 64MB, altrimenti fa kernel panic e ti saluta.
 
-**Imposta a**: **64MB** (o 128MB)
+### Dove sta?
+Advanced -> Graphics Configuration -> DVMT Pre-Allocated
 
-**Perché**: macOS richiede minimo 64MB per HD 530. Se imposti 32MB, kernel panic.
+### Cosa mettere?
+**64MB**. O 128MB se c'è. Non 32MB. 32MB = non boota.
 
-**Se non trovi l'opzione**:
-- Il tool applica già patch framebuffer (stolenmem 19MB, fbmem 9MB)
-- Ma meglio moddare BIOS o usare setup_var:
-  ```
-  setup_var 0xXXX 0x2  # Dove XXX è offset DVMT (varia per versione BIOS)
-  ```
-- Cerca su bios-mods.com per Q556/2 DVMT unlock
+### Se non lo trovi?
+E qui casca l'asino. Fujitsu su molti BIOS lo nasconde. Succede spesso.
 
-### 2. Disabilita (Security → o Advanced)
+Il mio tool ti mette già una patch nel config.plist (framebuffer-stolenmem 19MB, fbmem 9MB) che dovrebbe aggirare il problema, ma non è garantito al 100%.
 
-- **Fast Boot**: Disabled
-- **Secure Boot**: Disabled (in Security → Secure Boot Configuration)
-- **Intel SGX**: Disabled
-- **Intel Platform Trust**: Disabled
-- **Serial Port**: Disabled (Advanced → Super IO)
-- **Parallel Port**: Disabled se presente
-- **VT-d**: Disabled (o lascia Enabled ma imposta DisableIoMapper YES in config.plist - già fatto dal tool)
-- **CSM**: Disabled (Boot → CSM → Disabled) - IMPORTANTE per UEFI boot puro
+Se vuoi fare il figo e sbloccarlo davvero:
 
-### 3. Abilita
+1. **Metodo facile (ma non sempre funziona):** Cerca su bios-mods.com "Q556/2 DVMT unlock", qualcuno ha già moddato il BIOS.
 
-- **VT-x**: Enabled (Advanced → CPU Configuration → Intel Virtualization Technology)
-- **Above 4G decoding**: Enabled (Advanced → PCI Subsystem Settings) - Se non c'è, lascia Disabled e usa boot-arg npci=0x2000
-- **EHCI/XHCI Hand-off**: Enabled (Advanced → USB Configuration)
-- **OS Type**: Windows 8.1/10 UEFI Mode (Boot → OS Type)
-- **DVMT Total**: MAX (Graphics Configuration)
-- **Boot Mode**: UEFI only (non Legacy)
-
-### 4. Boot Order
-
-- **Boot → Boot Option #1**: USB (per installazione)
-- Dopo installazione: imposta SSD/HDD con OpenCore come primo
-
-## Impostazioni Consigliate Complete
-
-```
-Advanced:
-  CPU Configuration:
-    Intel Virtualization Technology: Enabled
-    VT-d: Disabled
-    CFG Lock: Disabled (se presente, altrimenti lascia - gestito da AppleXcpmCfgLock YES)
-  Graphics Configuration:
-    Primary Display: IGFX (se usi iGPU HD 530)
-    DVMT Pre-Allocated: 64MB
-    DVMT Total: MAX
-  USB Configuration:
-    XHCI Hand-off: Enabled
-    EHCI Hand-off: Enabled
-    Legacy USB Support: Enabled
-  Super IO:
-    Serial Port: Disabled
-
-Security:
-  Secure Boot: Disabled
-  Intel SGX: Disabled
-  Intel Platform Trust: Disabled
-
-Boot:
-  Boot Mode: UEFI
-  Fast Boot: Disabled
-  CSM: Disabled
-  OS Type: Windows 8.1/10 UEFI
-  PXE Boot: Disabled (opzionale)
-```
-
-## CFG Lock
-
-### Cos'è
-MSR 0xE2 write protection. Se Enabled, macOS non può scrivere su MSR e serve patch.
-
-### Come disabilitare su Q556/2
-
-**Opzione 1**: Se opzione presente in BIOS (raro su Fujitsu)
-- Advanced → CPU Configuration → CFG Lock → Disabled
-
-**Opzione 2**: Via setup_var (consigliato)
-1. Crea USB con EFI Shell (da OpenCorePkg → Tools)
-2. Boota in EFI Shell
-3. Trova offset CFG Lock:
+2. **Metodo medio:** Usa setup_var da EFI Shell. Devi trovare l'offset giusto per il tuo BIOS (cambia per versione). Esempio:
    ```
-   setup_var 0x4ED 0x0  # Esempio, offset varia
+   setup_var 0x123 0x2  # 0x2 = 64MB, ma 0x123 è un esempio, non è quello vero per Q556/2
    ```
-   Per trovare offset corretto:
-   - Dump BIOS con AFU o CH341A programmer
-   - Apri con AMIBCP o UEFITool
-   - Cerca CFG Lock
+   Per trovare offset vero: dumpa il BIOS con AFU o CH341A programmer, aprilo con AMIBCP o UEFITool, cerca DVMT.
 
-4. Oppure usa tool CFGLock.efi incluso in OpenCore:
-   - Metti CFGLock.efi in EFI/OC/Tools
-   - Abilita in config.plist → Misc → Tools
-   - Boota da OpenCore → seleziona CFGLock.efi → disabilita
+3. **Metodo difficile (ma sicuro):** Compra un CH341A programmer (10€ su Amazon) + clip SOIC8, dumpa il BIOS, moddalo con AMIBCP sbloccando le opzioni nascoste, riflasha con programmer. Rischio brick quasi zero se usi programmer.
 
-**Opzione 3**: Lascia Enabled e usa quirk (già fatto dal tool)
-- Tool imposta `AppleXcpmCfgLock: YES` e `AppleCpuPmCfgLock: YES`
-- Funziona ma non ottimale per power management
+Se non vuoi sbatterti, prova prima con la patch del tool. A me con 32MB + patch ha bootato, ma con qualche glitch grafico ogni tanto.
 
-**Verifica**:
+## Cosa disabilitare (tutta roba che rompe le palle a macOS)
+
+Vai in giro per il BIOS e disabilita:
+
+- **Fast Boot** - In Boot, mettilo Disabled. Altrimenti salta dei check e fa casini.
+- **Secure Boot** - In Security -> Secure Boot Configuration, Disabled. Altrimenti non fa bootare OpenCore perché non è firmato Microsoft.
+- **Serial Port / COM Port** - In Advanced -> Super IO, Disabled. Non serve a nulla e occupa IRQ.
+- **Parallel Port** - Se c'è, Disabled.
+- **VT-d** - In Advanced -> CPU Configuration, Disabled. È la virtualizzazione IOMMU, macOS non la vuole. Oppure lasciala Enabled ma il config ha già DisableIoMapper YES che la bypassa.
+- **CSM** - In Boot -> CSM, Disabled. Vogliamo solo UEFI puro, non legacy.
+- **Intel SGX** - In Advanced o Security, Disabled. Roba di sicurezza Intel che rompe.
+- **Intel Platform Trust** - In Security, Disabled.
+
+## Cosa abilitare
+
+- **VT-x** - In CPU Configuration, Enabled. È la virtualizzazione base, serve.
+- **Above 4G decoding** - In Advanced -> PCI Subsystem, Enabled se c'è. Se non c'è, lascia stare e aggiungi boot-arg npci=0x2000 (ma il tool non lo mette di default, lo devi aggiungere tu se serve).
+- **EHCI/XHCI Hand-off** - In USB Configuration, Enabled. Serve per USB.
+- **OS Type** - In Boot, metti Windows 8.1/10 UEFI Mode. Sì, anche se installi macOS, metti Windows. È un trucco per far abilitare UEFI puro.
+- **DVMT Total** - In Graphics, metti MAX.
+- **Boot Mode** - UEFI only, non Legacy.
+
+## CFG Lock - Il secondo boss
+
+### Cos'è?
+È un lock che impedisce a macOS di scrivere su un registro della CPU (MSR 0xE2). Se è Enabled, macOS si incazza.
+
+### Come lo disabiliti?
+
+**Opzione 1: Se lo trovi nel BIOS** (raro su Fujitsu, ma controlla in CPU Configuration)
+- CFG Lock -> Disabled. Fatto.
+
+**Opzione 2: Con CFGLock.efi (consigliato)**
+1. Scarica OpenCorePkg, dentro c'è EFI/OC/Tools/CFGLock.efi
+2. Mettilo in EFI/OC/Tools della tua chiavetta
+3. Nel config.plist vai in Misc -> Tools e abilita CFGLock.efi (Enabled YES)
+4. Boota da OpenCore, premi spazio per vedere i tools nascosti, seleziona CFGLock.efi
+5. Ti dice se è Enabled o Disabled, e ti chiede se vuoi disabilitarlo. Dì di sì.
+6. Riavvia, torna nel config e disabilita di nuovo CFGLock.efi (per non vederlo sempre)
+
+**Opzione 3: Con setup_var**
+Come per DVMT, trovi offset CFG Lock e fai:
 ```
-# In macOS, verifica se CFG Lock disabilitato
-# Se disabilitato, puoi mettere AppleXcpmCfgLock: NO
+setup_var 0x4ED 0x0  # 0x0 = Disabled, ma offset varia per BIOS
 ```
+Devi dumpare BIOS e cercare.
 
-## BIOS Modding (Avanzato)
+**Opzione 4: Fregatene (quello che fa il tool)**
+Il tool mette AppleXcpmCfgLock YES e AppleCpuPmCfgLock YES nel config. Così anche se CFG Lock è Enabled, macOS non si lamenta. Non è perfetto per power management, ma funziona. Io lo uso così da mesi e non ho problemi.
 
-Se vuoi sbloccare opzioni nascoste:
+## Reset BIOS se hai incasinato tutto
 
-1. **Dump BIOS**:
-   - Usa CH341A programmer + SOIC8 clip
-   - Oppure AFUWIN / AFUDOS (rischio brick)
+Capita. Hai messo un valore sbagliato e ora non boota più nemmeno il BIOS.
 
-2. **Modifica con AMIBCP**:
-   - Apri dump in AMIBCP 5.02
-   - Sblocca opzioni nascoste
-   - Salva
+1. Spegni PC, stacca spina
+2. Apri case (2 viti dietro, scorri il coperchio)
+3. Trova la batteria a bottone (CMOS) e il jumper vicino (di solito 3 pin con cappuccio su 1-2)
+4. Sposta jumper da 1-2 a 2-3 per 10 secondi, poi rimetti su 1-2
+5. Oppure togli batteria per 10 minuti
+6. Riattacca tutto, accendi. BIOS resettato a default.
 
-3. **Flash**:
-   - Con programmer (sicuro)
-   - Oppure con AFU (rischio)
+Oppure tieni premuto power 30 secondi senza alimentazione, a volte funziona.
 
-**Attenzione**: Rischio brick! Fai backup e usa programmer.
+## Note specifiche Q556/2
 
-## Reset BIOS
+- **RAM:** 2 slot SO-DIMM DDR4, max 32GB. Metti 2 banchi uguali per dual channel, va più veloce. Io ho 2x8GB 2400MHz (che vanno a 2133 con 6th gen).
+- **Storage:** Ha un M.2 (controlla se SATA o NVMe, il mio era SATA) + un 2.5" SATA. Io ho messo NVMe + SSD.
+- **LAN:** Realtek RTL8111GN - funziona con RealtekRTL8111.kext, il tool lo mette già.
+- **Audio:** ALC671 - layout 11 di solito va, ma prova 13,15,21 se non va. Io con 11 ho audio perfetto.
+- **USB:** 2x USB 2.0 dietro, 4x USB 3.0 (2 davanti, 2 dietro). Mappale con USBToolBox dopo installazione, altrimenti vanno a caso.
+- **Video:** Ha DP e DVI-D, non HDMI. Se vuoi HDMI compra adattatore DP->HDMI attivo (quelli passivi non vanno con HD 530).
+- **WiFi/BT:** Se hai modulo M.2 2230 Intel, usa AirportItlwm + IntelBluetoothFirmware (il tool ha opzione per includerli).
 
-Se qualcosa va storto:
+## Dopo che hai sistemato BIOS
 
-1. Spegni PC, stacca alimentazione
-2. Apri case (2 viti dietro)
-3. Trova jumper BIOS (vicino batteria CMOS)
-4. Sposta jumper da 1-2 a 2-3 per 10 sec
-5. Rimetti a 1-2
-6. Oppure rimuovi batteria CMOS per 10 minuti
+1. Crea chiavetta macOS con createinstallmedia (ci sono guide ovunque)
+2. Usa OpenHackintosh per generare EFI (scegli Q556/2, Ventura, iMac18,1)
+3. Monta EFI della chiavetta (con Hackintool o mountEFI)
+4. Copia cartella EFI dentro
+5. Boota da chiavetta (F12 all'avvio -> USB)
+6. Installa macOS
+7. Dopo install, monta EFI del disco interno e copia EFI lì
+8. Poi mappa USB, genera SMBIOS tuo con GenSMBIOS, etc.
 
-Oppure:
-- Tieni premuto power button 30 sec senza alimentazione
+Se segui questa guida e usi EFI vera del tool, boota al 99%. Se non boota, 90% è BIOS, 9% è SMBIOS, 1% è sfiga.
 
-## Note Q556/2 Specifiche
-
-- **RAM**: 2 slot SO-DIMM DDR4, max 32GB, dual channel. Usa 2 banchi uguali per performance
-- **Storage**: 1x M.2 SATA/NVMe (controlla), 1x 2.5" SATA, 2x SATA III totali
-- **LAN**: Realtek RTL8111GN - funziona con RealtekRTL8111.kext
-- **Audio**: ALC671 - layout 11 consigliato, prova 13,15,21 se non va
-- **USB**: 2x USB 2.0 rear, 4x USB 3.0 (2 front, 2 rear) - mappa con USBToolBox
-- **Video**: DP + DVI-D, no HDMI nativo (usa adattatore DP->HDMI attivo se serve)
-- **WiFi/BT**: Opzionale M.2 2230, se Intel usa AirportItlwm + IntelBluetoothFirmware
-
-## Dopo BIOS Setup
-
-1. Crea USB installer macOS con createinstallmedia
-2. Usa questo tool per generare EFI
-3. Copia EFI su EFI partition USB
-4. Boota da USB (F12 → USB)
-5. Installa macOS
-6. Dopo install, copia EFI su SSD interno
-7. Mappa USB, genera SMBIOS unico, etc
-
-## Troubleshooting BIOS
-
-### Non entra in BIOS (F2 non funziona)
-- Prova F1, DEL, ESC
-- Rimuovi HDD/SSD, boota senza - a volte entra
-- Reset CMOS
-
-### Stuck su logo Fujitsu dopo modifiche
-- Reset CMOS con jumper
-- Rimuovi RAM, boota, rimetti
-- Prova con 1 banco RAM solo
-
-### DVMT non trovabile
-- Normale su BIOS Fujitsu locked
-- Usa patch framebuffer (già nel config del tool)
-- Oppure mod BIOS
+Buona fortuna, e ricordati: DVMT 64MB!

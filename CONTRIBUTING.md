@@ -1,91 +1,136 @@
-# Contributing
+# Come contribuire - Senza troppi formalismi
 
-## Come contribuire
+Ciao! Se vuoi dare una mano a OpenHackintosh, sei il benvenuto. Non serve essere un genio di Hackintosh, basta avere voglia.
 
-### Setup dev
+## Come iniziare (veloce)
+
 ```bash
-git clone https://github.com/andreapieri151-afk/Fujistu-esprimo-q556-2-auxiliarty-tool
-cd Fujistu-esprimo-q556-2-auxiliarty-tool
+git clone https://github.com/andreapieri151-afk/OpenHackintosh.git
+cd OpenHackintosh
 pip install -r requirements.txt
+python3 main.py  # prova GUI
 ```
 
-### Test
+Se la GUI non parte perché manca customtkinter:
 ```bash
-# Test import
-python3 -c "import sys; sys.path.insert(0, 'src'); from efi_builder.builder import EFIBuilder; print('ok')"
-
-# Test build offline (dummy files)
-python3 src/cli.py --help
-
-# Test web
-python3 app.py
-# Open http://localhost:5000
-
-# Test GUI (macOS)
-python3 main.py
+pip install customtkinter pillow
 ```
 
-### Struttura
-- `src/efi_builder/hardware.py` - Profili hardware Q556/2, Q957, kext definitions
-- `src/efi_builder/downloader.py` - Downloader REALI da GitHub
-- `src/efi_builder/config_generator.py` - Generatore config.plist per Skylake
-- `src/efi_builder/smbios.py` - Generatore SMBIOS
-- `src/efi_builder/builder.py` - Orchestratore build
-- `src/efi_builder/validator.py` - Validatore EFI
-- `src/gui/app.py` - GUI moderna macOS
-- `src/cli.py` - CLI
-- `app.py` - Web Dashboard
-- `templates/` - HTML template
-- `assets/` - Icone, SSDT
+## Cosa puoi fare
 
-### Aggiungere nuovo hardware
+### 1. Aggiungere il tuo PC
 
-Modifica `src/efi_builder/hardware.py`:
+Se hai un Fujitsu diverso da Q556/2 o un altro mini PC Skylake/Kaby Lake, aggiungi il profilo.
+
+Apri `src/efi_builder/hardware.py` e aggiungi:
 
 ```python
-NEW_PROFILE = HardwareProfile(
-    name="Fujitsu Esprimo XXX",
-    board="DXXXX",
-    ...
+MIO_PC = HardwareProfile(
+    name="Il mio PC figo",
+    board="D1234",
+    chipset="Intel H110",
+    cpu_generations=["Skylake"],
+    igpu="HD 530",
+    lan_chip="Realtek RTL8111",
+    lan_kext="RealtekRTL8111.kext",
+    audio_codec="ALC671",
+    audio_layout_ids=[11,13,15],
+    usb_ports={"USB2": 2, "USB3": 4},
+    smbios_recommended=["iMac18,1"],
+    notes="DVMT 64MB necessario"
 )
 
-PROFILES["XXX"] = NEW_PROFILE
+PROFILES["MioPC"] = MIO_PC
 ```
 
-### Aggiungere nuovo kext
+Poi fai PR. Se funziona, lo aggiungo.
 
-Modifica `KEXTS` in `hardware.py`:
+### 2. Aggiungere kext
+
+Se manca un kext che ti serve, aggiungilo in `KEXTS` in `hardware.py`:
 
 ```python
-KEXTS["MyKext"] = {
-    "repo": "user/repo",
+KEXTS["MioKext"] = {
+    "repo": "utente/repo-github",
     "required": False,
-    "description": "...",
-    "bundle": "MyKext.kext"
+    "description": "A cosa serve",
+    "bundle": "MioKext.kext"
 }
 ```
 
-### Style
+Il downloader lo scaricherà da GitHub release.
 
-- Usa type hints
-- Docstring per funzioni pubbliche
-- Log con `self.log()` non print diretto
-- Gestisci errori download (non crashare se GitHub down)
+### 3. Migliorare la GUI
 
-### Pull Request
+La GUI è in `src/gui/app.py` con customtkinter. Se hai idee per renderla più bella o più usabile, fai pure. Io ho fatto del mio meglio ma non sono un designer.
 
-1. Fork
-2. Branch: `feature/mio-feature`
-3. Commit con messaggio chiaro
-4. Testa build
-5. PR con descrizione
+### 4. Fixare bug
 
-## Roadmap
+Se trovi bug, apri issue con:
+- Che PC hai
+- Che macOS vuoi
+- Log del tool (copia incolla)
+- Cosa ti aspettavi vs cosa è successo
 
-- [ ] Integrazione macserial nativo (per seriali più accurati)
-- [ ] USB mapping automatico
+### 5. Scrivere guide
+
+Se hai risolto un problema strano con Q556/2, scrivi una guida in `docs/`. Io ho scritto BIOS_GUIDE.md e FAKE_VS_REAL.md con sangue, se ne hai altre ben vengano.
+
+## Struttura progetto (così non ti perdi)
+
+```
+src/efi_builder/
+  hardware.py       -> Profili PC, kext, driver, SSDT
+  downloader.py     -> Scarica file veri da GitHub (quello che fixa i file finti)
+  config_generator.py -> Genera config.plist per Skylake
+  smbios.py         -> Genera seriali a caso
+  builder.py        -> Mette tutto insieme e fa ZIP
+  validator.py      -> Controlla se EFI è finta
+
+src/gui/
+  app.py            -> GUI bella con customtkinter
+
+src/cli.py          -> CLI per chi ama terminale
+app.py              -> Web dashboard Flask
+templates/index.html -> HTML della web dashboard
+```
+
+## Regole (poche)
+
+- **File veri, non finti**: Se aggiungi qualcosa, scaricalo da fonte ufficiale, non creare placeholder vuoti. Ho già dato con i file finti.
+- **Testa prima di fare PR**: Lancia `python3 main.py` o `python3 src/cli.py --help` e vedi se non crasha.
+- **Scrivi umano**: Nei log, nei messaggi, nei commenti, scrivi come parleresti a un amico, non come un manuale tecnico. Tipo "Sto scaricando OpenCore vero..." non "Downloading OpenCore...".
+- **Non rompere Q556/2**: Se aggiungi roba per altri PC, assicurati che Q556/2 continui a funzionare. È il profilo principale, quello che ho io.
+
+## PR
+
+1. Forka
+2. Branch: `feature/mia-idea-figa`
+3. Fai modifiche
+4. Testa che non rompa tutto
+5. Commit con messaggio che si capisce: "Aggiunto profilo Q558" non "fix"
+6. Apri PR con descrizione: cosa hai fatto, perché, testato su che hardware
+
+Non serve essere perfetti, se c'è qualcosa da sistemare te lo dico nella PR.
+
+## Cose che vorrei fare (se hai tempo)
+
+- [ ] macserial nativo per seriali più furbi (ora sono a caso ma formato giusto)
+- [ ] USB mapping automatico (ora devi farlo a mano con USBToolBox)
 - [ ] OCAT integration
 - [ ] Auto-update kexts
-- [ ] Creazione installer USB automatica (createinstallmedia wrapper)
-- [ ] Supporto per Q556 (non /2) e altri Esprimo
-- [ ] Traduzione EN/DE oltre IT
+- [ ] Creazione chiavetta installer automatica (createinstallmedia wrapper)
+- [ ] Supporto più hardware generico (se mi mandate profili)
+- [ ] Traduzione EN/DE oltre IT (ora è mezzo IT mezzo EN, lo so)
+
+Se ne fai una, sei un mito.
+
+## Domande?
+
+Apri issue su GitHub, rispondo quando ho tempo (di solito sera).
+
+Oppure leggi README, c'è già tanta roba.
+
+Grazie! ❤️
+
+Andrea - quello che ha bestemmiato 3 giorni davanti a un Fujitsu che non bootava

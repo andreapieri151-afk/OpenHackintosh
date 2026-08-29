@@ -1,181 +1,146 @@
-# Fake vs Real - Il problema risolto
+# Da file finti a file veri - La storia di come ho bestemmiato 3 giorni
 
-## Il problema del tool precedente (Google AI Studio)
+Ok, ti racconto cosa è successo davvero, senza giri di parole.
 
-### Cosa faceva
-Il tool generato con Google AI Studio creava:
+## Il tool di prima (quello fatto con Google AI Studio)
 
-```
-EFI/
-├── BOOT/
-│   └── BOOTx64.efi (0 bytes o testo finto)
-└── OC/
-    ├── ACPI/
-    │   └── SSDT-PLUG.aml (vuoto o placeholder)
-    ├── Drivers/
-    │   └── OpenRuntime.efi (finto)
-    ├── Kexts/
-    │   ├── Lilu.kext/
-    │   │   └── Contents/
-    │   │       └── Info.plist (vuoto o generico, senza binario)
-    │   └── VirtualSMC.kext (stessa cosa)
-    └── config.plist (struttura base ma incompleta, senza kexts)
-```
+Ero gasato, avevo appena scoperto AI Studio di Google, gli dico "fammi un tool che crea EFI per Q556/2". Lui mi fa una roba bellissima, cartelle ordinate, codice pulito, GUI carina.
 
-### Perché non funzionava
-- **BOOTx64.efi vuoto**: Non può bootare, OpenCore non parte
-- **Kext finti**: Mancano eseguibili in Contents/MacOS/, solo Info.plist vuoto
-- **config.plist incompleto**: Non lista kexts reali, mancano patch Skylake
-- **Nessun download**: File generati localmente come placeholder
-- **Design base**: UI semplice, non curata
+Lo provo. Genero l'EFI. La metto sulla chiavetta. Booto. 
 
-### Risultato
-- USB non boota
-- Stuck su logo Fujitsu
-- Oppure kernel panic immediato
-- Utente frustrato
+Niente. Logo Fujitsu, riavvio, logo Fujitsu, riavvio. All'infinito.
 
-## La soluzione (v2.0 - Questo tool)
+Controllo i file:
 
-### Cosa fa ORA
-
-#### 1. Downloader Reale (`downloader.py`)
-```python
-def download_opencore():
-    # Chiama GitHub API: https://api.github.com/repos/acidanthera/OpenCorePkg/releases/latest
-    # Trova asset RELEASE.zip
-    # Scarica file REALE (es: OpenCore-1.0.1-RELEASE.zip ~10MB)
-    # Estrae BOOTx64.efi REALE, OpenCore.efi REALE, Drivers REALI
-```
-
-```python
-def download_kext(repo, kext_name):
-    # Chiama GitHub API per repo (es: acidanthera/Lilu)
-    # Scarica ZIP release REALE
-    # Estrae Lilu.kext con binario vero in Contents/MacOS/Lilu
-    # Verifica che non sia vuoto
-```
-
-#### 2. File REALI verificati
-```
-EFI/
-├── BOOT/
-│   └── BOOTx64.efi (REALE, 50KB+, da OpenCorePkg)
-└── OC/
-    ├── ACPI/
-    │   ├── SSDT-PLUG.aml (REALE, 200+ bytes, da Dortania)
-    │   ├── SSDT-EC-USBX.aml (REALE)
-    │   └── ...
-    ├── Drivers/
-    │   ├── HfsPlus.efi (REALE, 30KB+)
-    │   ├── OpenRuntime.efi (REALE)
-    │   └── OpenCanopy.efi (REALE)
-    ├── Kexts/
-    │   ├── Lilu.kext/
-    │   │   └── Contents/
-    │   │       ├── Info.plist (REALE, 5KB+, con CFBundleIdentifier)
-    │   │       └── MacOS/
-    │   │           └── Lilu (BINARIO REALE, 200KB+)
-    │   └── ...
-    ├── OpenCore.efi (REALE, 1MB+)
-    └── config.plist (GENERATO CORRETTO con kext list, patch Skylake, SMBIOS)
-```
-
-#### 3. Validazione
-`validator.py` controlla:
-- BOOTx64.efi esiste e >100 bytes?
-- Kext ha Info.plist e binario?
-- config.plist leggibile e con SMBIOS?
-- File troppo piccoli = fake → warning
-
-#### 4. Config.plist corretto
-Basato su Dortania Skylake Desktop:
-- ACPI Add con SSDT reali
-- Kernel Add con Lilu first + tutti i kext scaricati
-- DeviceProperties con ig-platform-id corretto per HD 530
-- NVRAM con boot-args alcid=11
-- PlatformInfo con SMBIOS generato valido
-- UEFI Drivers con HfsPlus, OpenRuntime
-
-### Test di realtà
-
-#### Prima (fake):
 ```bash
+$ ls -lh EFI/BOOT/BOOTx64.efi
+0 bytes
+
 $ ls -lh EFI/OC/Kexts/Lilu.kext/Contents/MacOS/
 total 0
-# VUOTO
+vuoto
 
-$ file EFI/BOOT/BOOTx64.efi
-empty
+$ cat EFI/OC/Kexts/Lilu.kext/Contents/Info.plist
+"fake plist"
 ```
 
-#### Ora (reale):
-```bash
-$ ls -lh EFI/OC/Kexts/Lilu.kext/Contents/MacOS/
--rwxr-xr-x  1 user  staff   245K Lilu
+Cioè, aveva creato la struttura, ma dentro file vuoti o con scritto "fake". Come se fai una torta bellissima fuori ma dentro è di cartone.
 
+Ecco perché non bootava. OpenCore non può partire se BOOTx64.efi è vuoto. I kext non possono caricarsi se non hanno il binario dentro.
+
+Ho perso 3 giorni a pensare fosse colpa del BIOS, di DVMT, di CFG Lock... invece erano file finti.
+
+## Ora come funziona davvero
+
+Ho riscritto tutto. Quando clicchi "Genera EFI", succede questo:
+
+### 1. Scarica OpenCore vero
+
+```python
+# Chiama GitHub API ufficiale
+https://api.github.com/repos/acidanthera/OpenCorePkg/releases/latest
+
+# Trova il file tipo OpenCore-1.0.1-RELEASE.zip (10MB, non 0 byte)
+# Lo scarica davvero
+# Estrae BOOTx64.efi vero (50KB, PE32+ executable, non testo)
+```
+
+Non è un file che creo io a caso. È quello ufficiale di Acidanthera, gli stessi che fanno OpenCore.
+
+### 2. Scarica i kext veri
+
+Stessa cosa per ogni kext:
+
+```python
+# Per Lilu:
+https://api.github.com/repos/acidanthera/Lilu/releases/latest
+# Scarica Lilu-1.6.7-RELEASE.zip
+# Estrae Lilu.kext con:
+# - Info.plist vero (5KB, con CFBundleIdentifier vero)
+# - MacOS/Lilu binario vero (245KB)
+```
+
+Prima il tool faceva:
+
+```python
+open("Lilu.kext/Contents/Info.plist", "w").write("fake")
+```
+
+Ora fa:
+
+```python
+download_file("https://github.com/acidanthera/Lilu/releases/download/.../Lilu-1.6.7-RELEASE.zip")
+extract_kext_from_zip()
+# Verifica che il binario esista e sia >100KB
+```
+
+### 3. Controlla che non siano finti
+
+Ho aggiunto un validatore che dice:
+
+```python
+if file_size < 100 bytes:
+    "Questo file è troppo piccolo, probabilmente è finto"
+```
+
+Così se qualcosa va storto nel download, te lo dice subito invece di farti una EFI che non boota.
+
+### 4. Config.plist fatto come si deve
+
+Prima il config era uno scheletro vuoto. Ora è basato sulla guida Dortania per Skylake Desktop, che è la Bibbia:
+
+- ACPI con SSDT-PLUG, EC-USBX, AWAC, PMC (quelli veri, non nomi a caso)
+- Kernel con Lilu per primo (obbligatorio, altrimenti non funziona nulla)
+- DeviceProperties con ig-platform-id giusto per HD 530 (00001219)
+- NVRAM con alcid=11 per ALC671
+- UEFI con ReleaseUsbOwnership YES (fix per EXITBS:START)
+
+Non l'ho inventato io, ho seguito Dortania passo passo.
+
+## Come capisci se è vero o finto?
+
+### Finto (prima):
+
+```bash
+$ file EFI/BOOT/BOOTx64.efi
+empty
+
+$ ls -lh EFI/OC/Kexts/Lilu.kext/Contents/MacOS/
+total 0
+
+$ ls -lh EFI/OC/Drivers/
+total 0
+```
+
+### Vero (ora):
+
+```bash
 $ file EFI/BOOT/BOOTx64.efi
 PE32+ executable (EFI application) x86-64
 
+$ ls -lh EFI/OC/Kexts/Lilu.kext/Contents/MacOS/
+-rwxr-xr-x  245K Lilu
+
 $ ls -lh EFI/OC/Drivers/
-HfsPlus.efi (40KB)
-OpenRuntime.efi (30KB)
-OpenCanopy.efi (80KB)
+40K HfsPlus.efi
+30K OpenRuntime.efi
+80K OpenCanopy.efi
 ```
 
-### Design
+Vedi la differenza? Uno è vuoto, l'altro ha roba dentro.
 
-#### Prima:
-- UI base con tkinter standard
-- Colori default, layout semplice
-- Nessuna progress bar
-- Log testuale base
+## Perché è importante?
 
-#### Ora:
-- **GUI**: customtkinter, dark mode, card layout, SF Pro font, progress bar, log colorato, badge, hardware info, SMBIOS preview
-- **Web**: gradient, blur, glassmorphism, monospace log, status badge, responsive
-- **Icona**: 3D render mini PC + Apple glow, professionale
+Perché su Hackintosh non puoi barare. OpenCore è un bootloader vero che gira prima di macOS, deve essere un eseguibile EFI vero. I kext sono driver veri che macOS carica, devono avere binari veri.
 
-### Codice
+Se sono finti, non boota. Punto.
 
-#### Prima:
-```python
-# Pseudo-codice fake
-def create_efi():
-    os.makedirs("EFI/BOOT")
-    open("EFI/BOOT/BOOTx64.efi", "w").write("fake efi")
-    # ...
-```
+Ora bootano. Testato sul mio Q556/2.
 
-#### Ora:
-```python
-# Codice reale con download
-def download_opencore():
-    release = get_latest_release("acidanthera/OpenCorePkg")
-    asset = find_asset(release, ["RELEASE"])
-    download_file(asset["browser_download_url"], zip_path)
-    extract_and_prepare()
+## Morale
 
-def build():
-    create_structure()
-    download_opencore()  # REALE
-    download_kexts()     # REALE
-    create_ssdts()       # REALE da Dortania
-    generate_config_plist() # CORRETTO per Skylake
-    create_zip()
-```
+Non fidarti dei tool che generano file senza scaricarli da fonti ufficiali. Se vedi una EFI di 100KB totale, è finta. Una EFI vera è almeno 10-15MB con tutti i kext e driver.
 
-## Conclusione
+Il mio tool ora genera EFI da 15-20MB, con file veri. Quella è la prova.
 
-| Aspetto | Prima (v1) | Ora (v2) |
-|---------|------------|----------|
-| File | Finti/vuoti | Reali da GitHub |
-| BOOTx64.efi | 0 bytes | 50KB+ PE32+ |
-| Kext binari | Mancanti | Presenti 100-300KB |
-| Config | Base incompleto | Dortania Skylake completo |
-| Download | No | Sì, da API ufficiale |
-| Validazione | No | Sì, detect fake |
-| Design | Base | Moderno, curato |
-| Bootabile | No | Sì |
-
-**Risultato**: Ora l'EFI boota davvero su Q556/2!
+Basta file finti. Basta bestemmiare davanti al logo Fujitsu.

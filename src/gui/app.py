@@ -1,17 +1,13 @@
 """
-Modern GUI for Fujitsu Esprimo Q556/2 EFI Creator
-Designed for macOS with customtkinter
-Fallback to tkinter if customtkinter not available
+OpenHackintosh - GUI che parla come una persona
+Non come quei tool freddi e tecnici
 """
 import sys
-import os
 import threading
 from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
-import json
 
-# Try customtkinter
 try:
     import customtkinter as ctk
     HAS_CTK = True
@@ -21,46 +17,37 @@ except ImportError:
     HAS_CTK = False
     ctk = None
 
-# Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from efi_builder.hardware import PROFILES, MACOS_VERSIONS, Q556_2
 from efi_builder.builder import EFIBuilder
-from efi_builder.smbios import generate_smbios
-
-class ModernButton:
-    """Wrapper for button"""
-    pass
 
 if HAS_CTK:
     class EFICreatorGUI:
         def __init__(self):
             self.root = ctk.CTk()
-            self.root.title("Fujitsu Q556/2 EFI Creator - Hackintosh Tool")
-            self.root.geometry("900x700")
-            self.root.minsize(850, 650)
-            
+            self.root.title("OpenHackintosh - EFI vere, non finte")
+            self.root.geometry("950x750")
+            self.root.minsize(900, 700)
             self.output_dir = Path.home() / "Desktop" / "EFI_Q5562"
-            self.builder = None
-            
             self.setup_ui()
         
         def setup_ui(self):
-            # Main container
             main_frame = ctk.CTkFrame(self.root)
             main_frame.pack(fill="both", expand=True, padx=20, pady=20)
             
-            # Header
             header = ctk.CTkFrame(main_frame, fg_color="transparent")
             header.pack(fill="x", padx=20, pady=(20,10))
             
-            title = ctk.CTkLabel(header, text="Fujitsu Esprimo Q556/2", font=ctk.CTkFont(size=24, weight="bold"))
+            title = ctk.CTkLabel(header, text="OpenHackintosh 🍎", font=ctk.CTkFont(size=28, weight="bold"))
             title.pack(anchor="w")
             
-            subtitle = ctk.CTkLabel(header, text="Hackintosh EFI Creator • Real files, no fake", font=ctk.CTkFont(size=14), text_color="gray")
+            subtitle = ctk.CTkLabel(header, text="Nato perché mi ero rotto di EFI finte che non bootano", font=ctk.CTkFont(size=14), text_color="gray")
             subtitle.pack(anchor="w")
             
-            # Content split
+            badge = ctk.CTkLabel(header, text="✓ File veri da GitHub ufficiale • No fuffa • Funziona davvero", font=ctk.CTkFont(size=11), text_color="#30d158")
+            badge.pack(anchor="w", pady=(5,0))
+            
             content = ctk.CTkFrame(main_frame, fg_color="transparent")
             content.pack(fill="both", expand=True, padx=20, pady=10)
             
@@ -70,11 +57,9 @@ if HAS_CTK:
             right = ctk.CTkFrame(content)
             right.pack(side="right", fill="both", expand=True, padx=(10,0))
             
-            # Left: Configuration
-            ctk.CTkLabel(left, text="Configurazione", font=ctk.CTkFont(size=16, weight="bold")).pack(anchor="w", padx=20, pady=(20,10))
+            ctk.CTkLabel(left, text="Il tuo PC", font=ctk.CTkFont(size=16, weight="bold")).pack(anchor="w", padx=20, pady=(20,10))
             
-            # Profile
-            ctk.CTkLabel(left, text="Modello Hardware:").pack(anchor="w", padx=20, pady=(10,0))
+            ctk.CTkLabel(left, text="Che PC hai?").pack(anchor="w", padx=20, pady=(10,0))
             self.profile_var = ctk.StringVar(value="Q556/2")
             self.profile_menu = ctk.CTkOptionMenu(left, values=list(PROFILES.keys()), variable=self.profile_var, command=self.on_profile_change)
             self.profile_menu.pack(fill="x", padx=20, pady=5)
@@ -83,37 +68,32 @@ if HAS_CTK:
             self.profile_info.pack(anchor="w", padx=20, pady=5)
             self.on_profile_change("Q556/2")
             
-            # macOS Version
-            ctk.CTkLabel(left, text="Versione macOS:").pack(anchor="w", padx=20, pady=(15,0))
+            ctk.CTkLabel(left, text="Che macOS vuoi?").pack(anchor="w", padx=20, pady=(15,0))
             self.macos_var = ctk.StringVar(value="Ventura 13.x")
             self.macos_menu = ctk.CTkOptionMenu(left, values=list(MACOS_VERSIONS.keys()), variable=self.macos_var)
             self.macos_menu.pack(fill="x", padx=20, pady=5)
             
-            # SMBIOS
-            ctk.CTkLabel(left, text="SMBIOS:").pack(anchor="w", padx=20, pady=(15,0))
+            ctk.CTkLabel(left, text="Che Mac fingiamo di essere?").pack(anchor="w", padx=20, pady=(15,0))
             self.smbios_var = ctk.StringVar(value="iMac18,1")
             self.smbios_menu = ctk.CTkOptionMenu(left, values=["iMac17,1", "iMac18,1", "iMac19,1", "Macmini8,1", "iMacPro1,1", "MacPro7,1"], variable=self.smbios_var)
             self.smbios_menu.pack(fill="x", padx=20, pady=5)
             
-            # Audio layout
-            ctk.CTkLabel(left, text="Audio Layout ID (ALC671):").pack(anchor="w", padx=20, pady=(15,0))
+            ctk.CTkLabel(left, text="Audio - se non va prova altri").pack(anchor="w", padx=20, pady=(15,0))
             self.audio_var = ctk.StringVar(value="11")
             self.audio_menu = ctk.CTkOptionMenu(left, values=["11", "13", "15", "21", "27", "28"], variable=self.audio_var)
             self.audio_menu.pack(fill="x", padx=20, pady=5)
             
-            # Options
-            ctk.CTkLabel(left, text="Opzioni Aggiuntive:").pack(anchor="w", padx=20, pady=(15,0))
+            ctk.CTkLabel(left, text="Extra (se hai WiFi Intel)").pack(anchor="w", padx=20, pady=(15,0))
             self.wifi_var = ctk.BooleanVar(value=False)
             self.bt_var = ctk.BooleanVar(value=False)
             
-            self.wifi_check = ctk.CTkCheckBox(left, text="Include Intel WiFi (AirportItlwm)", variable=self.wifi_var)
+            self.wifi_check = ctk.CTkCheckBox(left, text="Ho WiFi Intel (AirportItlwm)", variable=self.wifi_var)
             self.wifi_check.pack(anchor="w", padx=20, pady=5)
             
-            self.bt_check = ctk.CTkCheckBox(left, text="Include Intel Bluetooth", variable=self.bt_var)
+            self.bt_check = ctk.CTkCheckBox(left, text="Ho Bluetooth Intel", variable=self.bt_var)
             self.bt_check.pack(anchor="w", padx=20, pady=5)
             
-            # Output
-            ctk.CTkLabel(left, text="Cartella Output:").pack(anchor="w", padx=20, pady=(15,0))
+            ctk.CTkLabel(left, text="Dove la metto?").pack(anchor="w", padx=20, pady=(15,0))
             output_frame = ctk.CTkFrame(left, fg_color="transparent")
             output_frame.pack(fill="x", padx=20, pady=5)
             
@@ -121,40 +101,57 @@ if HAS_CTK:
             self.output_entry.pack(side="left", fill="x", expand=True, padx=(0,5))
             self.output_entry.insert(0, str(self.output_dir))
             
-            browse_btn = ctk.CTkButton(output_frame, text="Sfoglia", width=80, command=self.browse_output)
+            browse_btn = ctk.CTkButton(output_frame, text="Scegli", width=80, command=self.browse_output)
             browse_btn.pack(side="right")
             
-            # Build button
-            self.build_btn = ctk.CTkButton(left, text="🚀 Genera EFI Reale", font=ctk.CTkFont(size=16, weight="bold"), height=45, command=self.start_build)
+            self.build_btn = ctk.CTkButton(left, text="🚀 Crea EFI vera, non finta", font=ctk.CTkFont(size=16, weight="bold"), height=50, command=self.start_build)
             self.build_btn.pack(fill="x", padx=20, pady=20)
             
-            # Right: Logs and preview
-            ctk.CTkLabel(right, text="Log & Stato", font=ctk.CTkFont(size=16, weight="bold")).pack(anchor="w", padx=20, pady=(20,10))
+            ctk.CTkLabel(right, text="Cosa sta facendo", font=ctk.CTkFont(size=16, weight="bold")).pack(anchor="w", padx=20, pady=(20,10))
             
-            # Progress
             self.progress = ctk.CTkProgressBar(right)
             self.progress.pack(fill="x", padx=20, pady=10)
             self.progress.set(0)
             
-            self.status_label = ctk.CTkLabel(right, text="Pronto", font=ctk.CTkFont(size=12))
+            self.status_label = ctk.CTkLabel(right, text="Pronto a creare EFI vera", font=ctk.CTkFont(size=12))
             self.status_label.pack(anchor="w", padx=20, pady=5)
             
-            # Log textbox
             self.log_box = ctk.CTkTextbox(right, font=ctk.CTkFont(family="Courier", size=11))
             self.log_box.pack(fill="both", expand=True, padx=20, pady=10)
-            self.log_box.insert("1.0", "Benvenuto nel Fujitsu Q556/2 EFI Creator!\n\nQuesto tool genera EFI REALI, non finti:\n- Scarica OpenCore ufficiale da Acidanthera\n- Scarica kext reali (Lilu, VirtualSMC, etc)\n- Genera config.plist corretto per Skylake\n- Crea SMBIOS validi\n- Esporta ZIP pronto per USB\n\nSeleziona le opzioni a sinistra e clicca Genera.\n\n")
+            self.log_box.insert("1.0", """Ciao! Sono Andrea 👋
+
+Questo è OpenHackintosh, nato perché mi ero rotto di tool che creano EFI finte.
+
+Storia veloce:
+- Avevo Q556/2, volevo Hackintosh
+- Provo tool AI Studio, fa EFI bellissima ma file vuoti (0 byte)
+- 3 giorni a bestemmiare davanti a logo Fujitsu che si riavvia
+- Decido di riscriverlo da zero, con file veri
+
+Ora fa così:
+✓ Scarica OpenCore vero da Acidanthera (10MB, non 0 byte)
+✓ Scarica kext veri con binari dentro (Lilu 245KB, non vuoto)
+✓ Scarica SSDT veri da Dortania
+✓ Genera config.plist giusto per Skylake (non a caso)
+✓ Crea SMBIOS credibile
+✓ Fa ZIP pronto per USB
+
+Scegli il tuo PC a sinistra e clicca il bottone grosso.
+Se non boota, 99% è BIOS - leggi docs/BIOS_GUIDE.md, c'è scritto DVMT 64MB ovunque perché è fondamentale.
+
+Buon Hackintosh! 🍎
+""")
             
-            # Bottom: SMBIOS preview
             self.smbios_preview = ctk.CTkFrame(right)
             self.smbios_preview.pack(fill="x", padx=20, pady=(0,20))
             
-            ctk.CTkLabel(self.smbios_preview, text="SMBIOS Preview:", font=ctk.CTkFont(size=12, weight="bold")).pack(anchor="w", padx=10, pady=(10,0))
-            self.smbios_text = ctk.CTkLabel(self.smbios_preview, text="Verrà generato al build", justify="left", font=ctk.CTkFont(family="Courier", size=10), text_color="gray")
+            ctk.CTkLabel(self.smbios_preview, text="SMBIOS (generato a caso, poi rigenera con GenSMBIOS):", font=ctk.CTkFont(size=11, weight="bold")).pack(anchor="w", padx=10, pady=(10,0))
+            self.smbios_text = ctk.CTkLabel(self.smbios_preview, text="Verrà generato quando crei EFI", justify="left", font=ctk.CTkFont(family="Courier", size=10), text_color="gray")
             self.smbios_text.pack(anchor="w", padx=10, pady=10)
         
         def on_profile_change(self, value):
             profile = PROFILES.get(value, Q556_2)
-            info = f"Board: {profile.board}\nLAN: {profile.lan_chip}\nAudio: {profile.audio_codec}\nChipset: {profile.chipset}"
+            info = f"Board: {profile.board}\nLAN: {profile.lan_chip}\nAudio: {profile.audio_codec}\nCPU: {', '.join(profile.cpu_generations[:1])}"
             self.profile_info.configure(text=info)
         
         def browse_output(self):
@@ -170,7 +167,7 @@ if HAS_CTK:
         def _log(self, msg):
             self.log_box.insert("end", msg + "\n")
             self.log_box.see("end")
-            self.status_label.configure(text=msg[:60])
+            self.status_label.configure(text=msg[:65])
         
         def progress_callback(self, name, current, total):
             if total > 0:
@@ -178,12 +175,10 @@ if HAS_CTK:
                 self.root.after(0, lambda: self.progress.set(pct))
         
         def start_build(self):
-            # Disable button
-            self.build_btn.configure(state="disabled", text="⏳ Generazione in corso...")
+            self.build_btn.configure(state="disabled", text="⏳ Sto scaricando file veri...")
             self.progress.set(0.1)
             self.log_box.delete("1.0", "end")
             
-            # Get values
             profile = self.profile_var.get()
             macos = self.macos_var.get()
             smbios_model = self.smbios_var.get()
@@ -195,11 +190,9 @@ if HAS_CTK:
             def build_thread():
                 try:
                     builder = EFIBuilder(output, progress_callback=self.progress_callback)
-                    
                     def log_wrapper(event, msg=""):
                         if event == "log":
                             self.log(msg)
-                    
                     builder.progress_callback = log_wrapper
                     
                     result = builder.build(
@@ -225,91 +218,67 @@ if HAS_CTK:
         
         def on_build_success(self, result):
             self.progress.set(1.0)
-            self.build_btn.configure(state="normal", text="🚀 Genera EFI Reale")
-            self.status_label.configure(text="Completato!")
+            self.build_btn.configure(state="normal", text="🚀 Crea EFI vera, non finta")
+            self.status_label.configure(text="Fatto! EFI vera pronta!")
             
             smbios = result["smbios"]
             preview = f"Model: {smbios['ProductName']}\nSerial: {smbios['SerialNumber']}\nMLB: {smbios['MLB']}\nUUID: {smbios['SystemUUID'][:8]}...\nROM: {smbios['ROM']}"
             self.smbios_text.configure(text=preview)
             
-            self.log(f"\n✓ EFI generata in: {result['efi_path']}")
-            self.log(f"✓ ZIP: {result['zip_path']}")
+            self.log(f"\n🎉 FATTO! EFI vera in: {result['efi_path']}")
+            self.log(f"📦 ZIP: {result['zip_path']}")
+            self.log(f"Ora copia su USB e prova a bootare. Se non boota, leggi BIOS_GUIDE.md!")
             
-            messagebox.showinfo("Successo", f"EFI generata con successo!\n\nPercorso: {result['efi_path']}\nZIP: {result['zip_path']}\n\nSMBIOS:\nSerial: {smbios['SerialNumber']}\nModel: {smbios['ProductName']}")
+            messagebox.showinfo("Fatto! 🎉", f"EFI vera creata!\n\nDove: {result['efi_path']}\nZIP: {result['zip_path']}\n\nSeriale: {smbios['SerialNumber']}\nModello: {smbios['ProductName']}\n\nOra copia su USB e boota. Se non va, è BIOS (DVMT 64MB!).")
         
         def on_build_failed(self, result):
             self.progress.set(0)
-            self.build_btn.configure(state="normal", text="🚀 Genera EFI Reale")
-            self.status_label.configure(text="Fallito")
-            messagebox.showerror("Errore", f"Build fallito: {result.get('error', 'Unknown')}")
+            self.build_btn.configure(state="normal", text="🚀 Crea EFI vera, non finta")
+            self.status_label.configure(text="Fallito, riproviamo")
+            messagebox.showerror("Ops", f"Non ce l'ho fatta: {result.get('error', 'boh')}\nControlla internet, GitHub a volte ha limiti.")
         
         def on_build_error(self, msg, traceback_str):
             self.progress.set(0)
-            self.build_btn.configure(state="normal", text="🚀 Genera EFI Reale")
+            self.build_btn.configure(state="normal", text="🚀 Crea EFI vera, non finta")
             self.status_label.configure(text="Errore")
-            self.log(f"\n✗ ERRORE: {msg}\n{traceback_str}")
-            messagebox.showerror("Errore", f"Errore durante il build:\n{msg}")
+            self.log(f"\n💥 Errore: {msg}\n{traceback_str}")
+            messagebox.showerror("Errore", f"Errore: {msg}\n\nSe non capisci, apri issue su GitHub con questo log.")
         
         def run(self):
             self.root.mainloop()
 
 else:
-    # Fallback tkinter
     class EFICreatorGUI:
         def __init__(self):
             self.root = tk.Tk()
-            self.root.title("Fujitsu Q556/2 EFI Creator")
+            self.root.title("OpenHackintosh - EFI vere")
             self.root.geometry("800x600")
-            
             self.output_dir = Path.home() / "Desktop" / "EFI_Q5562"
-            
             self.setup_ui()
         
         def setup_ui(self):
-            # Simple fallback
             frame = ttk.Frame(self.root, padding=20)
             frame.pack(fill="both", expand=True)
-            
-            ttk.Label(frame, text="Fujitsu Esprimo Q556/2 EFI Creator", font=("Arial", 16, "bold")).pack(anchor="w", pady=10)
-            ttk.Label(frame, text="Install customtkinter for better UI: pip install customtkinter").pack(anchor="w")
-            
-            # Profile
-            ttk.Label(frame, text="Modello:").pack(anchor="w", pady=(10,0))
+            ttk.Label(frame, text="OpenHackintosh - Installa customtkinter per GUI bella", font=("Arial", 14, "bold")).pack(anchor="w", pady=10)
+            ttk.Label(frame, text="pip install customtkinter").pack(anchor="w")
             self.profile_var = tk.StringVar(value="Q556/2")
             ttk.OptionMenu(frame, self.profile_var, "Q556/2", *PROFILES.keys()).pack(fill="x", pady=5)
-            
-            ttk.Label(frame, text="macOS:").pack(anchor="w", pady=(10,0))
-            self.macos_var = tk.StringVar(value="Ventura 13.x")
-            ttk.OptionMenu(frame, self.macos_var, "Ventura 13.x", *MACOS_VERSIONS.keys()).pack(fill="x", pady=5)
-            
-            ttk.Label(frame, text="SMBIOS:").pack(anchor="w", pady=(10,0))
-            self.smbios_var = tk.StringVar(value="iMac18,1")
-            ttk.OptionMenu(frame, self.smbios_var, "iMac18,1", "iMac17,1", "iMac18,1", "iMac19,1", "Macmini8,1", "iMacPro1,1").pack(fill="x", pady=5)
-            
-            ttk.Button(frame, text="Genera EFI", command=self.start_build).pack(fill="x", pady=20)
-            
+            ttk.Button(frame, text="Genera EFI (ma installa customtkinter prima)", command=self.start_build).pack(fill="x", pady=20)
             self.log_text = tk.Text(frame, height=20)
             self.log_text.pack(fill="both", expand=True, pady=10)
-            
-            self.log_text.insert("1.0", "Fallback GUI - installa customtkinter per UI migliore\n")
+            self.log_text.insert("1.0", "GUI base - installa customtkinter per quella bella\n")
         
         def start_build(self):
-            # Similar build logic but simpler
             import threading
             def build():
-                self.log_text.insert("end", "Avvio build...\n")
+                self.log_text.insert("end", "Avvio...\n")
                 try:
-                    output = self.output_dir
-                    builder = EFIBuilder(output)
-                    result = builder.build(
-                        profile_name=self.profile_var.get(),
-                        smbios_model=self.smbios_var.get(),
-                        macos_version=self.macos_var.get()
-                    )
-                    self.log_text.insert("end", f"Completato: {result}\n")
+                    from efi_builder.builder import EFIBuilder
+                    builder = EFIBuilder(self.output_dir)
+                    result = builder.build(profile_name=self.profile_var.get())
+                    self.log_text.insert("end", f"Fatto: {result}\n")
                 except Exception as e:
                     self.log_text.insert("end", f"Errore: {e}\n")
-            
             threading.Thread(target=build, daemon=True).start()
         
         def run(self):
