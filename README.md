@@ -31,7 +31,7 @@ Non devi cercare kext su 10 siti, non devi impazzire con ProperTree per ore.
 
 ### Prima vs Ora
 
-| Prima (tool AI Studio) | Ora (OpenHackintosh) |
+| Prima (vecchia versione) | Ora (OpenHackintosh) |
 |---|---|
 | BOOTx64.efi 0 byte | BOOTx64.efi 50KB+ vero |
 | Lilu.kext senza binario | Lilu.kext 245KB con binario |

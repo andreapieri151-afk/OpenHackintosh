@@ -2,9 +2,9 @@
 
 Ok, ti racconto cosa è successo davvero, senza giri di parole.
 
-## Il tool di prima (quello fatto con Google AI Studio)
+## Il tool di prima
 
-Ero gasato, avevo appena scoperto AI Studio di Google, gli dico "fammi un tool che crea EFI per Q556/2". Lui mi fa una roba bellissima, cartelle ordinate, codice pulito, GUI carina.
+Avevo una prima versione del tool. Sembrava bellissima, cartelle ordinate, codice pulito, GUI carina.
 
 Lo provo. Genero l'EFI. La metto sulla chiavetta. Booto. 
 

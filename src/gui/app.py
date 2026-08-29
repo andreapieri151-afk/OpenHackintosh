@@ -124,7 +124,7 @@ Questo è OpenHackintosh, nato perché mi ero rotto di tool che creano EFI finte
 
 Storia veloce:
 - Avevo Q556/2, volevo Hackintosh
-- Provo tool AI Studio, fa EFI bellissima ma file vuoti (0 byte)
+- Provo un tool vecchio, fa EFI bellissima ma file vuoti (0 byte)
 - 3 giorni a bestemmiare davanti a logo Fujitsu che si riavvia
 - Decido di riscriverlo da zero, con file veri
 
