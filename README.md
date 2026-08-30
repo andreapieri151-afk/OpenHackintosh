@@ -49,9 +49,6 @@ Non devi cercare kext su 10 siti, non devi impazzire con ProperTree per ore.
 - SMBIOS consigliato: iMac18,1
 - macOS: Ventura va una meraviglia, Sonoma con iMacPro1,1
 
-**Fujitsu Esprimo Q957** - Simile al Q556/2
-- Board D3403-U2/D3600, Q270, Intel I219 LAN
-- Stessa EFI, cambia solo kext LAN (IntelMausi invece di Realtek)
 
 ### 🚧 In arrivo nei prossimi giorni
 
