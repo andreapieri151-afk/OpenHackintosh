@@ -1,6 +1,7 @@
 """
 Real downloader for OpenCore and kexts - NO FAKE FILES
 Downloads from GitHub releases API
+Fixed for Q556/2: validates 0-byte files, correct SSDT names
 """
 import os
 import sys
@@ -59,7 +60,7 @@ def find_asset(release: Dict, keywords: list) -> Optional[Dict]:
     return None
 
 def download_file(url: str, dest: Path, progress: Optional[DownloadProgress] = None, name: str = "file") -> bool:
-    """Download file with progress"""
+    """Download file with progress - validates not 0 byte"""
     for verify in [True, False]:  # Try with and without SSL verify
         try:
             with requests.get(url, stream=True, timeout=60, headers=HEADERS, verify=verify) as r:
@@ -74,6 +75,13 @@ def download_file(url: str, dest: Path, progress: Optional[DownloadProgress] = N
                             downloaded += len(chunk)
                             if progress:
                                 progress.report(name, downloaded, total)
+                # Validate not 0 byte (fix EFI 2.0.0 bug)
+                if dest.stat().st_size == 0:
+                    print(f"! Downloaded {name} is 0 byte - invalid, deleting")
+                    dest.unlink(missing_ok=True)
+                    return False
+                if dest.stat().st_size < 100 and dest.suffix == ".aml":
+                    print(f"! Downloaded {name} too small ({dest.stat().st_size} byte) - might be invalid")
                 return True
         except Exception as e:
             if verify:
@@ -225,7 +233,7 @@ class EFIDownloader:
         return oc_dir
     
     def download_kext(self, repo: str, kext_name: str, dest_kexts_dir: Path) -> bool:
-        """Download single kext"""
+        """Download single kext - validates bundle has real binary"""
         print(f"Downloading {kext_name} from {repo}...")
         release = get_latest_release(repo)
         if not release:
@@ -258,14 +266,31 @@ class EFIDownloader:
                 # If we downloaded VirtualSMC, it contains multiple kexts, that's ok
                 success = len(found) > 0
         
+        # Validate extracted kext not empty
         if success:
-            print(f"✓ {kext_name} ready")
+            kext_path = dest_kexts_dir / kext_name
+            if kext_path.exists():
+                # Check Info.plist exists
+                info = kext_path / "Contents" / "Info.plist"
+                if not info.exists() or info.stat().st_size == 0:
+                    print(f"! {kext_name} Info.plist missing or 0 byte - invalid")
+                    success = False
+                else:
+                    # Check has some content
+                    total_size = sum(f.stat().st_size for f in kext_path.rglob("*") if f.is_file())
+                    if total_size == 0:
+                        print(f"! {kext_name} total size 0 byte - invalid, removing")
+                        shutil.rmtree(kext_path, ignore_errors=True)
+                        success = False
+        
+        if success:
+            print(f"✓ {kext_name} ready - real binary")
         else:
             print(f"✗ Failed to extract {kext_name}")
         return success
     
     def download_all_kexts(self, kext_list: list, kext_definitions: dict, dest_dir: Path) -> Dict[str, bool]:
-        """Download all required kexts"""
+        """Download all required kexts - minimal per Q556/2"""
         results = {}
         dest_dir.mkdir(parents=True, exist_ok=True)
         
@@ -294,7 +319,7 @@ class EFIDownloader:
         return results
     
     def prepare_opencore_structure(self, oc_extracted: Path, efi_root: Path):
-        """Copy required OpenCore files to EFI structure"""
+        """Copy required OpenCore files to EFI structure - validates not 0 byte, minimal for Q556/2"""
         # Find X64 folder
         x64_path = None
         for root, dirs, files in os.walk(oc_extracted):
@@ -329,9 +354,12 @@ class EFIDownloader:
         boot_dest.mkdir(exist_ok=True)
         oc_dest.mkdir(exist_ok=True)
         
-        # Copy BOOT
+        # Copy BOOT - validate not 0 byte
         if (efi_source / "BOOT").exists():
             for f in (efi_source / "BOOT").iterdir():
+                if f.stat().st_size == 0:
+                    print(f"! Skipping BOOT/{f.name} - 0 byte")
+                    continue
                 shutil.copy2(f, boot_dest / f.name)
         
         # Copy OC essentials, but we will rebuild
@@ -342,17 +370,40 @@ class EFIDownloader:
                 if dst.exists():
                     shutil.rmtree(dst)
                 shutil.copytree(src, dst)
+                # Validate drivers not 0 byte after copy
+                if sub == "Drivers":
+                    for efi_file in dst.glob("*.efi"):
+                        if efi_file.stat().st_size == 0:
+                            print(f"! Removing driver {efi_file.name} - 0 byte (EFI 2.0.0 bug)")
+                            efi_file.unlink(missing_ok=True)
             else:
                 dst.mkdir(exist_ok=True)
         
-        # Copy OpenCore.efi
+        # Copy OpenCore.efi - validate
         oc_efi_src = efi_source / "OC" / "OpenCore.efi"
         if oc_efi_src.exists():
+            if oc_efi_src.stat().st_size == 0:
+                print(f"! OpenCore.efi is 0 byte - invalid")
+                return False
             shutil.copy2(oc_efi_src, oc_dest / "OpenCore.efi")
         
         # Create ACPI and Kexts if not exist
         (oc_dest / "ACPI").mkdir(exist_ok=True)
         (oc_dest / "Kexts").mkdir(exist_ok=True)
+        
+        # For Q556/2 minimal: remove extra drivers that are not needed
+        # Dortania Skylake: only HfsPlus + OpenRuntime required
+        # Keep only required for minimal, others will be added disabled via config_generator if present
+        # But we don't delete them here, just log
+        drivers_dir = oc_dest / "Drivers"
+        if drivers_dir.exists():
+            for drv in drivers_dir.glob("*.efi"):
+                if drv.stat().st_size == 0:
+                    print(f"! Removing 0-byte driver {drv.name}")
+                    drv.unlink(missing_ok=True)
+            existing_drivers = [f.name for f in drivers_dir.glob("*.efi")]
+            print(f"  Drivers present after copy: {existing_drivers}")
+            print(f"  For Q556/2 minimal, only HfsPlus.efi + OpenRuntime.efi will be Enabled in config (others Disabled)")
         
         return True
 

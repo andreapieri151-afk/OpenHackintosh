@@ -44,6 +44,10 @@ Se non sai cosa fare, lancia la GUI: python main.py
     parser.add_argument("--output", type=Path, default=Path.home() / "Desktop" / "EFI_Q5562", help="Dove metto EFI generata? Default Desktop")
     parser.add_argument("--wifi", action="store_true", help="Metti anche kext per WiFi Intel (AirportItlwm)")
     parser.add_argument("--bluetooth", action="store_true", help="Metti anche kext per Bluetooth Intel")
+    parser.add_argument("--optional-kexts", action="store_true", help="Includi kext opzionali (NVMeFix, RestrictEvents) - non necessari per boot base")
+    parser.add_argument("--optional-ssdts", action="store_true", help="Includi SSDT-PMC opzionale (solo se NVRAM rotta su H110)")
+    parser.add_argument("--dev", action="store_true", help="Modalità DEV: con -v keepsyms debug=0x100 e Misc Debug abilitato")
+    parser.add_argument("--no-minimal", action="store_true", help="Disabilita minimal Q556/2 specifica (carica tutti driver generici)")
     parser.add_argument("--no-zip", action="store_true", help="Non creare ZIP, lascia solo cartella")
     parser.add_argument("--list-profiles", action="store_true", help="Fammi vedere che PC supporti")
     parser.add_argument("--list-macos", action="store_true", help="Fammi vedere che macOS supporti")
@@ -104,6 +108,10 @@ non roba finta da 0 byte come faceva il tool di prima.
         macos_version=args.macos,
         include_wifi=args.wifi,
         include_bluetooth=args.bluetooth,
+        include_optional_kexts=args.optional_kexts,
+        include_optional_ssdts=args.optional_ssdts,
+        dev_mode=args.dev,
+        minimal_q5562=not args.no_minimal,
         generate_zip=not args.no_zip
     )
     

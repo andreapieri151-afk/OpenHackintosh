@@ -86,12 +86,29 @@ if HAS_CTK:
             ctk.CTkLabel(left, text="Extra (se hai WiFi Intel)").pack(anchor="w", padx=20, pady=(15,0))
             self.wifi_var = ctk.BooleanVar(value=False)
             self.bt_var = ctk.BooleanVar(value=False)
+            self.optional_kexts_var = ctk.BooleanVar(value=False)
+            self.optional_ssdts_var = ctk.BooleanVar(value=False)
+            self.dev_mode_var = ctk.BooleanVar(value=False)
+            self.minimal_var = ctk.BooleanVar(value=True)
             
             self.wifi_check = ctk.CTkCheckBox(left, text="Ho WiFi Intel (AirportItlwm)", variable=self.wifi_var)
             self.wifi_check.pack(anchor="w", padx=20, pady=5)
             
             self.bt_check = ctk.CTkCheckBox(left, text="Ho Bluetooth Intel", variable=self.bt_var)
             self.bt_check.pack(anchor="w", padx=20, pady=5)
+
+            self.optional_kexts_check = ctk.CTkCheckBox(left, text="Kext opzionali (NVMeFix, RestrictEvents)", variable=self.optional_kexts_var)
+            self.optional_kexts_check.pack(anchor="w", padx=20, pady=5)
+
+            self.optional_ssdts_check = ctk.CTkCheckBox(left, text="SSDT-PMC opzionale (se NVRAM rotta)", variable=self.optional_ssdts_var)
+            self.optional_ssdts_check.pack(anchor="w", padx=20, pady=5)
+
+            ctk.CTkLabel(left, text="Modalità EFI").pack(anchor="w", padx=20, pady=(15,0))
+            self.dev_check = ctk.CTkCheckBox(left, text="DEV mode (-v debug, per test)", variable=self.dev_mode_var)
+            self.dev_check.pack(anchor="w", padx=20, pady=5)
+
+            self.minimal_check = ctk.CTkCheckBox(left, text="Minimal Q556/2 specifica (consigliata)", variable=self.minimal_var)
+            self.minimal_check.pack(anchor="w", padx=20, pady=5)
             
             ctk.CTkLabel(left, text="Dove la metto?").pack(anchor="w", padx=20, pady=(15,0))
             output_frame = ctk.CTkFrame(left, fg_color="transparent")
@@ -185,6 +202,10 @@ Buon Hackintosh! 🍎
             audio_layout = int(self.audio_var.get())
             include_wifi = self.wifi_var.get()
             include_bt = self.bt_var.get()
+            include_optional_kexts = self.optional_kexts_var.get()
+            include_optional_ssdts = self.optional_ssdts_var.get()
+            dev_mode = self.dev_mode_var.get()
+            minimal_q5562 = self.minimal_var.get()
             output = Path(self.output_entry.get())
             
             def build_thread():
@@ -202,6 +223,10 @@ Buon Hackintosh! 🍎
                         macos_version=macos,
                         include_wifi=include_wifi,
                         include_bluetooth=include_bt,
+                        include_optional_kexts=include_optional_kexts,
+                        include_optional_ssdts=include_optional_ssdts,
+                        dev_mode=dev_mode,
+                        minimal_q5562=minimal_q5562,
                         generate_zip=True
                     )
                     

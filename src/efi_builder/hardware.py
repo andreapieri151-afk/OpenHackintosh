@@ -127,43 +127,104 @@ KEXTS = {
     }
 }
 
-# OpenCore drivers
+# OpenCore drivers - solo quelli realmente necessari per Q556/2
+# Dortania Skylake Desktop: HfsPlus + OpenRuntime sono REQUIRED
+# OpenCanopy: opzionale per GUI, ResetNvramEntry: utile per debug
 DRIVERS = {
-    "HfsPlus": {"required": True, "file": "HfsPlus.efi", "desc": "HFS+ filesystem"},
-    "OpenRuntime": {"required": True, "file": "OpenRuntime.efi", "desc": "Runtime services"},
-    "OpenCanopy": {"required": False, "file": "OpenCanopy.efi", "desc": "GUI boot picker"},
-    "ResetNvramEntry": {"required": False, "file": "ResetNvramEntry.efi", "desc": "Reset NVRAM"},
-    "OpenLinuxBoot": {"required": False, "file": "OpenLinuxBoot.efi", "desc": "Linux boot"},
+    "HfsPlus": {
+        "required": True, 
+        "file": "HfsPlus.efi", 
+        "desc": "HFS+ filesystem - REQUIRED per leggere installer macOS HFS+",
+        "for_q5562": True
+    },
+    "OpenRuntime": {
+        "required": True, 
+        "file": "OpenRuntime.efi", 
+        "desc": "Runtime services - REQUIRED sempre",
+        "for_q5562": True
+    },
+    "OpenCanopy": {
+        "required": False, 
+        "file": "OpenCanopy.efi", 
+        "desc": "GUI boot picker - opzionale, per avere interfaccia grafica invece di testo",
+        "for_q5562": False,
+        "note": "Utile ma non necessario. Se vuoi boot picker testuale, rimuovilo"
+    },
+    "ResetNvramEntry": {
+        "required": False, 
+        "file": "ResetNvramEntry.efi", 
+        "desc": "Reset NVRAM entry - utile per debug, non per boot",
+        "for_q5562": False,
+        "note": "Utile se devi resettare NVRAM spesso durante test, altrimenti rimuovibile"
+    },
+    "OpenLinuxBoot": {
+        "required": False, 
+        "file": "OpenLinuxBoot.efi", 
+        "desc": "Linux boot - solo se dual boot con Linux",
+        "for_q5562": False,
+        "note": "Non necessario per Q556/2 Hackintosh puro"
+    },
 }
 
-# SSDTs for Q556/2 - based on Dortania Skylake Desktop guide
+# Drivers realmente necessari per Q556/2 minimal
+Q556_2_REQUIRED_DRIVERS = ["HfsPlus", "OpenRuntime"]
+Q556_2_OPTIONAL_DRIVERS = ["OpenCanopy", "ResetNvramEntry"]
+
+# SSDTs - Corretti per Q556/2 basati su Dortania prebuilt table
+# Per Skylake/Kaby Lake Desktop (Q556/2 H110, Q957 Q270): solo PLUG + EC-USBX-DESKTOP
+# Per Coffee Lake (Q957 mod): + AWAC + PMC
+# Vedi: https://deepwiki.com/dortania/Getting-Started-With-ACPI/3.1-prebuilt-ssdts
 SSDTs = {
-    "SSDT-PLUG": {
+    "SSDT-PLUG-DRTNIA": {
         "required": True,
-        "desc": "CPU power management - enables XCPM",
-        "source": "Dortania"
+        "file": "SSDT-PLUG-DRTNIA.aml",
+        "desc": "CPU power management - enables XCPM (Skylake/Kaby Lake)",
+        "source": "Dortania",
+        "url": "https://raw.githubusercontent.com/dortania/Getting-Started-With-ACPI/master/extra-files/compiled/SSDT-PLUG-DRTNIA.aml",
+        "for_chipset": ["H110", "Q270", "H270", "Z270", "Q270", "B250"]
     },
-    "SSDT-EC-USBX": {
+    "SSDT-EC-USBX-DESKTOP": {
         "required": True,
-        "desc": "Fix embedded controller + USB power",
-        "source": "Dortania"
+        "file": "SSDT-EC-USBX-DESKTOP.aml",
+        "desc": "Fix embedded controller + USB power - REQUIRED for all desktops",
+        "source": "Dortania",
+        "url": "https://raw.githubusercontent.com/dortania/Getting-Started-With-ACPI/master/extra-files/compiled/SSDT-EC-USBX-DESKTOP.aml",
+        "for_chipset": ["H110", "Q270", "all"]
     },
     "SSDT-AWAC": {
-        "required": True,
-        "desc": "Fix AWAC/RTC clocks",
-        "source": "Dortania"
+        "required": False,
+        "file": "SSDT-AWAC.aml",
+        "desc": "Fix AWAC/RTC - ONLY for Coffee Lake+ (300 series) or boards with AWAC device. NOT needed for Q556/2 H110 Skylake",
+        "source": "Dortania",
+        "url": "https://raw.githubusercontent.com/dortania/Getting-Started-With-ACPI/master/extra-files/compiled/SSDT-AWAC.aml",
+        "for_chipset": ["Z370", "Z390", "B360", "H310", "H370", "Q370"],
+        "note": "Q556/2 H110 does NOT have AWAC, remove it. Only include if DSDT shows AWAC device"
     },
     "SSDT-PMC": {
-        "required": True,
-        "desc": "Fix NVRAM on H110 (PMC)",
-        "source": "Dortania"
+        "required": False,
+        "file": "SSDT-PMC.aml",
+        "desc": "Fix NVRAM on 300 series (B360, H310, etc). H110 has native NVRAM, but Fujitsu might need it if NVRAM broken",
+        "source": "Dortania",
+        "url": "https://raw.githubusercontent.com/dortania/Getting-Started-With-ACPI/master/extra-files/compiled/SSDT-PMC.aml",
+        "for_chipset": ["B360", "H310", "H370", "Z390", "Q370"],
+        "note": "For Q556/2 H110, NVRAM is native with Aptio V. Include only if NVRAM test fails (no boot var). Many Q556/2 EFIs include it anyway, safe to include but not required"
     },
     "SSDT-RHUB": {
         "required": False,
-        "desc": "Fix USB RHUB (optional)",
-        "source": "Dortania"
+        "file": "SSDT-RHUB.aml",
+        "desc": "Fix USB RHUB - ONLY for Comet Lake+ (400 series)",
+        "source": "Dortania",
+        "url": "https://raw.githubusercontent.com/dortania/Getting-Started-With-ACPI/master/extra-files/compiled/SSDT-RHUB.aml",
+        "for_chipset": ["Z490", "B460", "H410"],
+        "note": "NOT needed for Q556/2"
     }
 }
+
+# SSDTs realmente necessari per Q556/2 (verificato su Dortania + hardware reale)
+Q556_2_REQUIRED_SSDTS = ["SSDT-PLUG-DRTNIA", "SSDT-EC-USBX-DESKTOP"]
+Q556_2_OPTIONAL_SSDTS = ["SSDT-PMC"]  # Opzionale se NVRAM non funziona
+Q957_REQUIRED_SSDTS = ["SSDT-PLUG-DRTNIA", "SSDT-EC-USBX-DESKTOP"]
+Q957_OPTIONAL_SSDTS = ["SSDT-PMC", "SSDT-AWAC"]  # Se mod Coffee Lake
 
 # macOS versions support
 MACOS_VERSIONS = {
@@ -173,8 +234,14 @@ MACOS_VERSIONS = {
     "Sequoia 15.x": {"min_oc": "1.0.0", "smbios": ["iMacPro1,1", "Macmini8,1"], "recommended": False, "note": "Experimental, requires OCLP or extra patches"},
 }
 
-def get_kexts_for_profile(profile_name: str, include_wifi: bool = False, include_bluetooth: bool = False):
+def get_kexts_for_profile(profile_name: str, include_wifi: bool = False, include_bluetooth: bool = False, include_optional: bool = False):
+    """
+    Ritorna kext realmente necessari per Q556/2
+    Minimal: Lilu, VirtualSMC, WhateverGreen, AppleALC, RealtekRTL8111/IntelMausi
+    Optional: NVMeFix, RestrictEvents, SMCProcessor, etc - solo se richiesti
+    """
     profile = PROFILES.get(profile_name, Q556_2)
+    # Solo kext essenziali per boot - verificati su Q556/2 reale
     kexts = ["Lilu", "VirtualSMC", "WhateverGreen", "AppleALC"]
     
     if profile.lan_kext == "RealtekRTL8111.kext":
@@ -182,8 +249,9 @@ def get_kexts_for_profile(profile_name: str, include_wifi: bool = False, include
     else:
         kexts.append("IntelMausi")
     
-    # Always useful
-    kexts.extend(["NVMeFix", "RestrictEvents"])
+    # Opzionali solo se richiesti esplicitamente
+    if include_optional:
+        kexts.extend(["NVMeFix", "RestrictEvents"])
     
     if include_bluetooth:
         kexts.append("IntelBluetoothFirmware")
@@ -191,3 +259,7 @@ def get_kexts_for_profile(profile_name: str, include_wifi: bool = False, include
         kexts.append("AirportItlwm")
     
     return kexts
+
+def get_optional_kexts():
+    """Kext opzionali per Q556/2 - utili ma non necessari per boot"""
+    return ["NVMeFix", "RestrictEvents", "USBToolBox"]
