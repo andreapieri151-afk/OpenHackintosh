@@ -12,6 +12,22 @@
 - `requirements.txt`: rimossi `flask`, `customtkinter`, `pillow`, `packaging`; resta `requests`
 - README, CONTRIBUTING, `.github/DESCRIPTION.md` aggiornati: il progetto è CLI-only
 
+### EFI Generator Hardening (2.0.2)
+
+- **NO FAKE BINARIES**: nessun placeholder/fake se un componente obbligatorio non è ottenibile/verificato.
+- **Binary validation** (`src/efi/integrity.py`): Mach-O per kext, PE/COFF per driver/OpenCore/BOOTx64, firma AML per SSDT.
+- **Hash / Integrity**: SHA-256, versione/source, download time per ogni componente.
+- **Download cache** (`~/.cache/openhackintosh`): riusa zip solo se integro; invalida e ri-scarica se corrotti.
+- **Config.plist consistency**: cross-reference ACPI/Kext/Driver config <-> file realmente presenti.
+- **Zero-byte / placeholder scan** ricorsiva globale.
+- **Component Selection minimale**: di default SOLO required. Opzionali espliciti (`--wifi`, `--bluetooth`, `--include-nvme`, `--include-restrict-events`, `--include-optional-drivers`).
+- **SSDT da profilo**: Q556/2/Q957 usano `SSDT-PLUG-DRTNIA.aml` e `SSDT-EC-USBX-DESKTOP.aml`; niente AWAC/RHUB automatici.
+- **DeviceProperties dal profilo** (no valori inventati).
+- **Release vs Dev**: release boot-args pulito; `--dev` abilita debug.
+- **Final EFI Audit** (`src/efi/audit.py`) + **generation/failure report** (`VALID` / `FAILED`).
+- Interfaccia `generate --json` ora produce JSON pulito (log nascosti in json mode).
+- Test di hardening (37 totali) per download failure, fake/invalid binaries, 0-byte, missing kext/driver/ACPI, config mismatch, exit code, Q556/2.
+
 ### Fondazione intelligente (2.0.2)
 
 - **Hardware Detection** (`src/hardware/detection.py`): rileva DMI, CPU, GPU/PCI, audio, Ethernet, WiFi, USB, storage, ACPI; MAI inventa, altrimenti "Unknown / Not detected".

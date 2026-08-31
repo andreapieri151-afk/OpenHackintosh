@@ -18,6 +18,12 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 import plistlib
 
+from efi.integrity import (
+    validate_aml_file,
+    validate_efi_binary,
+    validate_kext,
+)
+
 
 PLACEHOLDER_MARKERS = [
     b"placeholder",
@@ -41,6 +47,37 @@ def _file_state(path: Path, min_size: int = 100) -> str:
     except Exception:
         pass
     return "REAL"
+
+
+def _binary_state(path: Path) -> str:
+    res = validate_efi_binary(path)
+    if not path.exists():
+        return "MISSING"
+    if res.ok:
+        return "REAL"
+    return "INVALID"
+
+
+def _aml_state(path: Path) -> str:
+    res = validate_aml_file(path)
+    if not path.exists():
+        return "MISSING"
+    if res.ok:
+        return "REAL"
+    if res.reason in ("EMPTY_TOO_SMALL", "PLACEHOLDER"):
+        return "PLACEHOLDER"
+    return "INVALID"
+
+
+def _kext_state(kext_dir: Path) -> str:
+    res = validate_kext(kext_dir)
+    if not kext_dir.exists():
+        return "MISSING"
+    if res.ok:
+        return "REAL"
+    if res.reason in ("MISSING_OR_EMPTY_INFO_PLIST", "MISSING_EXECUTABLE", "NOT_MACH_O", "PLACEHOLDER"):
+        return "INVALID"
+    return "INVALID"
 
 
 @dataclass
@@ -76,15 +113,15 @@ def _check_kext_consistency(config: Dict[str, Any], kexts_dir: Path,
         if not bundle:
             continue
         kext_dir = kexts_dir / bundle
-        state = _file_state(kext_dir / "Contents" / "Info.plist", min_size=50)
+        state = _kext_state(kext_dir)
         if state == "MISSING":
             components.append(ComponentState(bundle, "MISSING", str(kext_dir),
                                              "Kext configurato ma file assente"))
             issues.append(f"Kext configured but missing: {bundle}")
-        elif state == "PLACEHOLDER":
-            components.append(ComponentState(bundle, "PLACEHOLDER", str(kext_dir),
-                                             "Kext vuoto/placeholder"))
-            issues.append(f"Kext placeholder/invalid: {bundle}")
+        elif state == "INVALID":
+            components.append(ComponentState(bundle, "INVALID", str(kext_dir),
+                                             "Kext non valido (binario Mach-O, Info.plist o eseguibile)"))
+            issues.append(f"Kext invalid: {bundle}")
         elif state == "REAL":
             components.append(ComponentState(bundle, "REAL", str(kext_dir)))
 
@@ -110,13 +147,16 @@ def _check_acpi_consistency(config: Dict[str, Any], acpi_dir: Path,
         if not name:
             continue
         aml = acpi_dir / name
-        state = _file_state(aml, min_size=50)
+        state = _aml_state(aml)
         if state == "MISSING":
             components.append(ComponentState(name, "MISSING", str(aml), "ACPI configurato ma assente"))
             issues.append(f"ACPI configured but missing: {name}")
         elif state == "PLACEHOLDER":
             components.append(ComponentState(name, "PLACEHOLDER", str(aml), "AML vuoto/placeholder"))
             issues.append(f"AML placeholder/invalid: {name}")
+        elif state == "INVALID":
+            components.append(ComponentState(name, "INVALID", str(aml), "AML non valido"))
+            issues.append(f"AML invalid: {name}")
         elif state == "REAL":
             components.append(ComponentState(name, "REAL", str(aml)))
 
@@ -140,13 +180,13 @@ def _check_driver_consistency(config: Dict[str, Any], drivers_dir: Path,
         if not name:
             continue
         driver = drivers_dir / name
-        state = _file_state(driver, min_size=100)
+        state = _binary_state(driver)
         if state == "MISSING":
             components.append(ComponentState(name, "MISSING", str(driver), "Driver configurato ma assente"))
             issues.append(f"Driver configured but missing: {name}")
-        elif state == "PLACEHOLDER":
-            components.append(ComponentState(name, "PLACEHOLDER", str(driver), "Driver placeholder"))
-            issues.append(f"Driver placeholder: {name}")
+        elif state == "INVALID":
+            components.append(ComponentState(name, "INVALID", str(driver), "Driver non valido (PE/COFF)"))
+            issues.append(f"Driver invalid: {name}")
         elif state == "REAL":
             components.append(ComponentState(name, "REAL", str(driver)))
 
@@ -180,7 +220,10 @@ def validate_efi(efi_root: Path) -> dict:
         ("OC/config.plist", efi_root / "OC" / "config.plist"),
     ]
     for label, path in required_paths:
-        state = _file_state(path, min_size=50)
+        if label.endswith(".plist"):
+            state = _file_state(path, min_size=50)
+        else:
+            state = _binary_state(path)
         results["checks"][label] = state
         components.append(ComponentState(label, state, str(path)))
         if state == "MISSING":
@@ -241,7 +284,11 @@ def validate_efi(efi_root: Path) -> dict:
             results["warnings"].append(f"Duplicate check: {issue}")
         seen.add(issue)
 
-    has_placeholder = results["states"]["PLACEHOLDER"] > 0 or results["states"]["MISSING"] > 0
+    has_placeholder = (
+        results["states"]["PLACEHOLDER"] > 0
+        or results["states"]["MISSING"] > 0
+        or results["states"]["INVALID"] > 0
+    )
     if has_placeholder:
         results["valid"] = False
 

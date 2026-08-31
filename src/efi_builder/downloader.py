@@ -12,6 +12,8 @@ import requests
 from pathlib import Path
 from typing import Callable, Optional, Dict
 
+from efi.integrity import validate_efi_binary, validate_kext
+
 GITHUB_API = "https://api.github.com/repos/{repo}/releases/latest"
 HEADERS = {"Accept": "application/vnd.github.v3+json", "User-Agent": "Q5562-EFI-Tool/1.0"}
 
@@ -186,7 +188,36 @@ class EFIDownloader:
         self.progress = DownloadProgress(progress_callback)
         self.temp_dir = self.work_dir / "temp"
         self.temp_dir.mkdir(exist_ok=True)
-    
+        home = Path(os.environ.get("HOME", "."))
+        self.cache_dir = Path(os.environ.get("OPENHACKINTOSH_CACHE", home / ".cache" / "openhackintosh"))
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+
+    def _cached_zip(self, name: str) -> Optional[Path]:
+        """Restituisce lo zip in cache solo se integro (>0 byte), altrimenti None."""
+        path = self.cache_dir / name
+        if path.exists() and path.stat().st_size > 0:
+            return path
+        return None
+
+    def _get_zip(self, url: str, name: str, progress_label: str) -> Optional[Path]:
+        """Usa cache se presente, altrimenti scarica. Non riutilizza file corrotti."""
+        cached = self._cached_zip(name)
+        if cached:
+            print(f"Cache hit: {cached}")
+            return cached
+        dest = self.cache_dir / name
+        if download_file(url, dest, self.progress, progress_label):
+            return dest
+        return None
+
+    def _invalidate_cache(self, name: str) -> None:
+        try:
+            path = self.cache_dir / name
+            if path.exists():
+                path.unlink()
+        except Exception:
+            pass
+
     def download_opencore(self, version: str = "latest") -> Optional[Path]:
         """Download OpenCorePkg"""
         print("Downloading OpenCore...")
@@ -208,21 +239,29 @@ class EFIDownloader:
             print("OpenCore asset not found")
             return None
         
-        zip_path = self.temp_dir / asset["name"]
-        if not download_file(asset["browser_download_url"], zip_path, self.progress, "OpenCore"):
-            return None
-        
-        # Extract
-        oc_dir = self.work_dir / "OpenCore"
-        if oc_dir.exists():
-            shutil.rmtree(oc_dir)
-        oc_dir.mkdir()
-        
-        with zipfile.ZipFile(zip_path, 'r') as z:
-            z.extractall(oc_dir)
-        
-        print(f"OpenCore extracted to {oc_dir}")
-        return oc_dir
+        # Cache: se lo zip in cache produce un OpenCore invalido, invalida e riscarica.
+        for attempt in (0, 1):
+            zip_path = self._get_zip(asset["browser_download_url"], asset["name"], "OpenCore")
+            if not zip_path:
+                return None
+
+            oc_dir = self.work_dir / "OpenCore"
+            if oc_dir.exists():
+                shutil.rmtree(oc_dir)
+            oc_dir.mkdir()
+
+            with zipfile.ZipFile(zip_path, 'r') as z:
+                z.extractall(oc_dir)
+
+            candidates = list(oc_dir.rglob("OpenCore.efi"))
+            if candidates and validate_efi_binary(candidates[0]).ok:
+                print(f"OpenCore extracted to {oc_dir}")
+                return oc_dir
+
+            print(f"OpenCore corrupt/invalid at attempt {attempt + 1}, invalidando cache e riscarico")
+            self._invalidate_cache(asset["name"])
+
+        return None
     
     def download_kext(self, repo: str, kext_name: str, dest_kexts_dir: Path) -> bool:
         """Download single kext"""
@@ -242,27 +281,35 @@ class EFIDownloader:
             print(f"No asset for {kext_name}")
             return False
         
-        zip_path = self.temp_dir / f"{kext_name}_{asset['name']}"
-        if not download_file(asset["browser_download_url"], zip_path, self.progress, kext_name):
-            return False
-        
         dest_kexts_dir.mkdir(parents=True, exist_ok=True)
-        # Try extract specific kext
-        success = extract_kext_from_zip(zip_path, kext_name, dest_kexts_dir)
-        if not success:
-            # Try extract all and check
-            found = extract_all_kexts(zip_path, dest_kexts_dir)
-            success = kext_name in found or any(kext_name.lower() in f.lower() for f in found)
-            if not success and found:
-                print(f"Found kexts: {found}, but not {kext_name}")
-                # If we downloaded VirtualSMC, it contains multiple kexts, that's ok
-                success = len(found) > 0
-        
-        if success:
-            print(f"✓ {kext_name} ready")
-        else:
-            print(f"✗ Failed to extract {kext_name}")
-        return success
+        cache_name = asset["name"]
+
+        for attempt in (0, 1):
+            zip_path = self._get_zip(asset["browser_download_url"], cache_name, kext_name)
+            if not zip_path:
+                return False
+
+            # Try extract specific kext
+            success = extract_kext_from_zip(zip_path, kext_name, dest_kexts_dir)
+            if not success:
+                # Try extract all and check
+                found = extract_all_kexts(zip_path, dest_kexts_dir)
+                success = kext_name in found or any(kext_name.lower() in f.lower() for f in found)
+                if not success and found:
+                    print(f"Found kexts: {found}, but not {kext_name}")
+                    success = len(found) > 0
+
+            # Validazione binaria reale prima di considerare il componente valido.
+            if success and validate_kext(dest_kexts_dir / kext_name).ok:
+                print(f"✓ {kext_name} ready (binary validated)")
+                return True
+
+            print(f"✗ {kext_name} invalid/corrupt at attempt {attempt + 1}, invalidando cache e riscarico")
+            success = False
+            self._invalidate_cache(cache_name)
+
+        print(f"✗ Failed to extract valid {kext_name}")
+        return False
     
     def download_all_kexts(self, kext_list: list, kext_definitions: dict, dest_dir: Path) -> Dict[str, bool]:
         """Download all required kexts"""
@@ -280,18 +327,33 @@ class EFIDownloader:
             success = self.download_kext(repo, bundle, dest_dir)
             results[kext_key] = success
             
-            # Download extra bundles if any
+            # Download extra bundles if any (dal medesimo zip scaricato/cache).
             if success and "extra_bundles" in definition:
-                # They are in same zip, already extracted via extract_all
-                zip_name = None
-                for f in self.temp_dir.glob(f"{bundle}_*"):
-                    zip_name = f
-                    break
+                zip_name = self._find_zip_with(bundle)
                 if zip_name and zip_name.exists():
                     for extra in definition["extra_bundles"]:
                         extract_kext_from_zip(zip_name, extra, dest_dir)
+                        # I kext extra (VirtualSMC.child) devono essere reali anch'essi.
+                        if not validate_kext(dest_dir / extra).ok:
+                            print(f"✗ {extra} extracted but INVALID binary")
+                            results[kext_key] = False
         
         return results
+
+    def _find_zip_with(self, bundle_name: str) -> Optional[Path]:
+        """Cerca uno zip (cache o temp) che contenga il bundle richiesto."""
+        roots = [self.cache_dir, self.temp_dir]
+        for root in roots:
+            if not root.exists():
+                continue
+            for zip_path in root.glob("*.zip"):
+                try:
+                    with zipfile.ZipFile(zip_path) as z:
+                        if any(bundle_name in n for n in z.namelist()):
+                            return zip_path
+                except Exception:
+                    continue
+        return None
     
     def prepare_opencore_structure(self, oc_extracted: Path, efi_root: Path):
         """Copy required OpenCore files to EFI structure"""

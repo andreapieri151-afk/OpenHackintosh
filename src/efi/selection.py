@@ -76,40 +76,36 @@ def select_components(
     profile: HardwareProfile,
     include_wifi: bool = False,
     include_bluetooth: bool = False,
-    include_nvme: bool = True,
-    include_restrict_events: bool = True,
+    include_nvme: bool = False,
+    include_restrict_events: bool = False,
     include_usb_toolbox: bool = False,
+    include_optional_drivers: bool = False,
 ) -> ComponentSelection:
-    """Seleziona i componenti a partire dal profilo. Non include cose inutili."""
+    """Seleziona i componenti a partire dal profilo. Nessun componente 'just in case'.
+
+    Di default vengono inclusi SOLO i REQUIRED. Ogni opzionale (kext, driver, SSDT)
+    entra esclusivamente se abilitato esplicitamente dal chiamante.
+    """
     sel = ComponentSelection(
         required_kexts=list(profile.required_kexts),
-        optional_kexts=list(profile.optional_kexts),
+        # Optional si parte vuoto: vanno abilitati su richiesta, mai "just in case".
+        optional_kexts=[],
         required_drivers=list(profile.required_drivers),
-        optional_drivers=list(profile.optional_drivers),
+        optional_drivers=[] if not include_optional_drivers else list(profile.optional_drivers),
         required_ssdts=list(profile.required_ssdts),
-        optional_ssdts=list(profile.optional_ssdts),
+        optional_ssdts=[],
     )
 
-    # Filtro opzionali che non devono entrare di default
-    optional_excluded: List[str] = []
-    if not include_wifi:
-        optional_excluded.append("AirportItlwm")
-    if not include_bluetooth:
-        optional_excluded.append("IntelBluetoothFirmware")
-    if not include_nvme:
-        optional_excluded.append("NVMeFix")
-    if not include_restrict_events:
-        optional_excluded.append("RestrictEvents")
-    if not include_usb_toolbox:
-        optional_excluded.append("USBToolBox")
+    # Aggiunge gli opzionali SOLO se richiesti esplicitamente.
+    if include_wifi and "AirportItlwm" in profile.optional_kexts:
+        sel.optional_kexts.append("AirportItlwm")
+    if include_bluetooth and "IntelBluetoothFirmware" in profile.optional_kexts:
+        sel.optional_kexts.append("IntelBluetoothFirmware")
+    if include_nvme and "NVMeFix" in profile.optional_kexts:
+        sel.optional_kexts.append("NVMeFix")
+    if include_restrict_events and "RestrictEvents" in profile.optional_kexts:
+        sel.optional_kexts.append("RestrictEvents")
+    if include_usb_toolbox and "USBToolBox" in profile.optional_kexts:
+        sel.optional_kexts.append("USBToolBox")
 
-    # Driver OpenCanopy e' opzionale: non incluso di default per EFI minimale
-    optional_driver_excluded = ["OpenCanopy", "OpenLinuxBoot"]
-    sel.optional_drivers = [
-        d for d in sel.optional_drivers if d not in optional_driver_excluded
-    ]
-
-    sel.optional_kexts = [
-        k for k in sel.optional_kexts if k not in optional_excluded
-    ]
     return sel

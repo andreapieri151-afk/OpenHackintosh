@@ -11,6 +11,7 @@ import plistlib
 from .hardware import PROFILES, KEXTS, DRIVERS, SSDTs, get_kexts_for_profile, Q556_2
 from .downloader import EFIDownloader
 from efi.selection import ComponentSelection, KEXT_BUNDLES
+from efi.integrity import validate_efi_binary
 from .smbios import generate_smbios
 from .config_generator import generate_config, save_config
 
@@ -79,6 +80,18 @@ class EFIBuilder:
             if f.name not in allowed:
                 self.log(f"  - Driver rimosso (non necessario): {f.name}")
                 f.unlink(missing_ok=True)
+
+    def validate_opencore_binaries(self) -> bool:
+        """OpenCore.efi e BOOTx64.efi devono essere binari EFI reali (PE/COFF)."""
+        boot = self.efi_root / "BOOT" / "BOOTx64.efi"
+        oc = self.efi_root / "OC" / "OpenCore.efi"
+        boot_res = validate_efi_binary(boot)
+        oc_res = validate_efi_binary(oc)
+        if not oc_res.ok:
+            self.log(f"  ✗ OpenCore.efi invalid: {oc_res.reason}")
+        if not boot_res.ok:
+            self.log(f"  ✗ BOOTx64.efi invalid: {boot_res.reason}")
+        return oc_res.ok and boot_res.ok
 
     def validate_critical_components(self, required_kexts: List[str]) -> Dict[str, bool]:
         """Verifica che i kext obbligatori siano davvero presenti e non vuoti."""
@@ -183,7 +196,9 @@ class EFIBuilder:
         existing = [p.name for p in acpi_dir.glob("*.aml") if p.stat().st_size > 0]
         self.log(f"✓ {len(existing)} SSDT pronti (solo file reali, mai vuoti)")
     
-    def generate_config_plist(self, profile_name: str, smbios_model: str, audio_layout: int, macos_version: str, smbios_data: Optional[Dict] = None):
+    def generate_config_plist(self, profile_name: str, smbios_model: str, audio_layout: int,
+                              macos_version: str, smbios_data: Optional[Dict] = None,
+                              device_properties: Optional[Dict] = None, dev: bool = False):
         """Generate config.plist"""
         self.log(f"⚙️  Genero config.plist per {profile_name} / {smbios_model} / {macos_version}...")
         self.log(f"   (basato su Dortania Skylake, non a caso)")
@@ -197,7 +212,9 @@ class EFIBuilder:
             smbios_data=smbios_data,
             profile_name=profile_name,
             audio_layout=audio_layout,
-            macos_version=macos_version
+            macos_version=macos_version,
+            device_properties=device_properties,
+            dev=dev,
         )
         
         dest = self.efi_root / "OC" / "config.plist"
@@ -305,11 +322,14 @@ Fatta con ❤️ e bestemmie davanti a un Q556/2 che non bootava
         include_bluetooth: bool = False,
         generate_zip: bool = True,
         selection: Optional[ComponentSelection] = None,
-        strict: bool = True
+        strict: bool = True,
+        dev: bool = False,
+        device_properties: Optional[Dict] = None
     ) -> Dict:
         """Full build process, hardware-aware e strict."""
         self.log(f"=== 🚀 Creo EFI per {profile_name} ===")
         self.log(f"Obiettivo: {macos_version} / {smbios_model} / audio layout {audio_layout}")
+        self.log(f"Modalità: {'DEV' if dev else 'RELEASE'}")
         self.log(f"Prometto: file veri, non finti come prima")
 
         if selection is None:
@@ -323,6 +343,11 @@ Fatta con ❤️ e bestemmie davanti a un Q556/2 che non bootava
 
         if not self.download_opencore():
             return {"success": False, "error": "OpenCore download failed", "logs": self.logs}
+
+        if not self.validate_opencore_binaries():
+            msg = "EFI generation aborted. Invalid OpenCore binary (not PE/COFF)."
+            self.log("✗ " + msg)
+            return {"success": False, "error": msg, "logs": self.logs}
 
         self.filter_drivers(selection.driver_files())
         kext_results = self.download_kexts(profile_name, include_wifi, include_bluetooth, kext_list=selection.kexts())
@@ -341,7 +366,10 @@ Fatta con ❤️ e bestemmie davanti a un Q556/2 che non bootava
             if strict:
                 return {"success": False, "error": str(exc), "logs": self.logs}
 
-        smbios_data, config = self.generate_config_plist(profile_name, smbios_model, audio_layout, macos_version)
+        smbios_data, config = self.generate_config_plist(
+            profile_name, smbios_model, audio_layout, macos_version,
+            device_properties=device_properties, dev=dev,
+        )
 
         self.create_readme(profile_name, macos_version, smbios_model)
 

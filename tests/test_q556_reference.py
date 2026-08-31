@@ -12,7 +12,10 @@ def test_q556_reference_profile_full():
     assert prof.manufacturer == "Fujitsu"
     assert "RealtekRTL8111" in prof.required_kexts
     assert prof.required_drivers == ["HfsPlus", "OpenRuntime"]
-    assert "SSDT-PLUG" in prof.required_ssdts
+    assert "SSDT-PLUG-DRTNIA" in prof.required_ssdts
+    assert "SSDT-EC-USBX-DESKTOP" in prof.required_ssdts
+    assert "SSDT-AWAC" not in prof.required_ssdts
+    assert "SSDT-RHUB" not in prof.required_ssdts
 
 
 def test_q556_reference_compatibility():

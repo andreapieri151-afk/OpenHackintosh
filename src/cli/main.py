@@ -75,6 +75,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_gen.add_argument("--bluetooth", action="store_true")
     p_gen.add_argument("--output", default="output/EFI", help="Directory output")
     p_gen.add_argument("--no-zip", action="store_true", help="Non creare ZIP")
+    p_gen.add_argument("--include-nvme", action="store_true", help="Includi kext opzionale NVMeFix")
+    p_gen.add_argument("--include-restrict-events", action="store_true", help="Includi kext opzionale RestrictEvents")
+    p_gen.add_argument("--include-optional-drivers", action="store_true", help="Includi driver opzionali del profilo")
     p_gen.set_defaults(func=run_generate)
 
     p_val = sub.add_parser("validate", parents=[common], help="Valida una EFI")

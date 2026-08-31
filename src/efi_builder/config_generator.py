@@ -4,7 +4,7 @@ Based on Dortania Skylake Desktop guide
 """
 import plistlib
 from pathlib import Path
-from typing import Dict, List
+from typing import Any, Dict, List, Optional
 import uuid
 
 def create_base_config() -> Dict:
@@ -522,9 +522,35 @@ def set_boot_args(config: Dict, profile_name: str, audio_layout: int = 11, extra
     config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["boot-args"] = base_args
     return config
 
-def set_device_properties(config: Dict, profile_name: str) -> Dict:
-    """Set device properties for HD 530"""
-    # For Q556/2 with HD 530
+def _hex_to_bytes(value) -> bytes:
+    if isinstance(value, bytes):
+        return value
+    if isinstance(value, str):
+        try:
+            return bytes.fromhex(value.replace("0x", ""))
+        except Exception:
+            return value.encode("utf-8", "replace")
+    return bytes(value) if isinstance(value, (bytearray, list)) else bytes()
+
+
+def set_device_properties(config: Dict, profile_name: str, device_properties: Optional[Dict] = None) -> Dict:
+    """DeviceProperties deve provenire dal profilo hardware.
+
+    Se `device_properties` è fornito (database profile) usa SOLO quelli.
+    Altrimenti (fallback legacy) usa i valori hardcoded noti.
+    """
+    if device_properties:
+        add: Dict[str, Any] = {}
+        for path, props in device_properties.items():
+            converted = {
+                key: _hex_to_bytes(val) for key, val in props.items()
+            }
+            add[path] = converted
+        config["DeviceProperties"]["Add"] = add
+        config["DeviceProperties"].setdefault("Delete", {})
+        return config
+
+    # Fallback legacy (senza profilo database) - mantenuto per compatibilità.
     igpu_props = {
         "AAPL,ig-platform-id": bytes.fromhex("00001219"),
         "framebuffer-patch-enable": bytes.fromhex("01000000"),
@@ -535,12 +561,11 @@ def set_device_properties(config: Dict, profile_name: str) -> Dict:
         "framebuffer-con1-enable": bytes.fromhex("01000000"),
         "framebuffer-con1-type": bytes.fromhex("00080000"),
     }
-    
-    # If 7th gen, use different platform-id
+
     if "Kaby" in profile_name or "Q957" in profile_name:
         igpu_props["AAPL,ig-platform-id"] = bytes.fromhex("00001259")
         igpu_props["device-id"] = bytes.fromhex("12590000")
-    
+
     config["DeviceProperties"]["Add"]["PciRoot(0x0)/Pci(0x2,0x0)"] = igpu_props
     return config
 
@@ -549,7 +574,9 @@ def generate_config(
     smbios_data: Dict,
     profile_name: str = "Q556/2",
     audio_layout: int = 11,
-    macos_version: str = "Ventura 13.x"
+    macos_version: str = "Ventura 13.x",
+    device_properties: Optional[Dict] = None,
+    dev: bool = False
 ) -> Dict:
     """Generate complete config.plist"""
     config = create_base_config()
@@ -563,8 +590,8 @@ def generate_config(
     config = add_acpi_to_config(config, acpi_dir)
     config = add_drivers_to_config(config, drivers_dir)
     config = set_smbios(config, smbios_data)
-    config = set_boot_args(config, profile_name, audio_layout)
-    config = set_device_properties(config, profile_name)
+    config = set_boot_args(config, profile_name, audio_layout, dev=dev)
+    config = set_device_properties(config, profile_name, device_properties=device_properties)
     
     # Adjust for macOS version
     if "Sonoma" in macos_version or "Sequoia" in macos_version:

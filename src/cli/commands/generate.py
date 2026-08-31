@@ -1,4 +1,4 @@
-"""openhackintosh generate — genera EFI hardware-aware."""
+"""openhackintosh generate — genera EFI hardware-aware, con audit finale."""
 
 from __future__ import annotations
 
@@ -7,14 +7,35 @@ from pathlib import Path
 from hardware import detect_all, identify
 from database import load_all_profiles, get_profile, match_profile
 from efi.generator import build_efi
-from efi import validate_efi
-from ..output import Out
+from cli.output import Out
+
+
+def _print_report_generation(result: dict) -> None:
+    report = result.get("generation_report") or {}
+    print("\nOpenHackintosh EFI Generator")
+    print("============================")
+    print("Profile:", report.get("profile", "-"))
+    print("Status:", report.get("state", "-"))
+    print("\nACPI:")
+    for status, name in report.get("acpi", []):
+        print(f"  {'OK' if status == 'ok' else 'FAIL'} {name}")
+    print("Drivers:")
+    for status, name in report.get("drivers", []):
+        print(f"  {'OK' if status == 'ok' else 'FAIL'} {name}")
+    print("Kexts:")
+    for status, name in report.get("kexts", []):
+        print(f"  {'OK' if status == 'ok' else 'FAIL'} {name}")
+    print("\nValidation:")
+    checks = report.get("checks", {})
+    for label, ok in checks.items():
+        print(f"  {'OK' if ok else 'FAIL'} {label}")
+    for err in report.get("errors", []):
+        print(f"  FAIL {err}")
 
 
 def run_generate(args, out: Out) -> dict:
     profiles = load_all_profiles()
 
-    # 1. Seleziona il profilo (dato oppure rilevato)
     profile = None
     if args.profile:
         profile = get_profile(args.profile, None)
@@ -43,13 +64,11 @@ def run_generate(args, out: Out) -> dict:
             msg = "Nessun profilo corrispondente; --force richiesto. NON raccomandato."
             out.data({"ok": False, "error": msg}, "Attenzione")
 
-    # 2. Rifiuto profili marcati UNSUPPORTED
     if profile.state == "UNSUPPORTED":
         msg = f"Profilo {profile.name} e' UNSUPPORTED. Non procedere."
         out.data({"ok": False, "error": msg}, "Errore")
         raise SystemExit(2)
 
-    # 3. Genera
     output_dir = Path(args.output)
     result = build_efi(
         profile=profile,
@@ -59,19 +78,30 @@ def run_generate(args, out: Out) -> dict:
         macos_version=args.macos,
         include_wifi=args.wifi,
         include_bluetooth=args.bluetooth,
+        include_nvme=args.include_nvme,
+        include_restrict_events=args.include_restrict_events,
         generate_zip=not args.no_zip,
         strict=True,
+        dev=args.dev,
+        silent=out.json_output,
     )
 
-    # 4. Valida sempre prima di dire che e' pronta
     if result.get("success"):
-        validation = validate_efi(Path(result["efi_path"]))
-        result["validation"] = validation
-        if not validation.get("ready") and not args.force:
-            result["success"] = False
-            result["error"] = "EFI generation aborted. Validation failed: " + "; ".join(validation.get("errors", []))
-            out.data(result, "Errore")
-            return result
+        out.data(result, "Esito")
+        if not out.json_output:
+            _print_report_generation(result)
+            print("\nEFI STATUS: VALID")
+        return result
 
-    out.data(result, "Esito")
+    out.data({
+        "ok": False,
+        "success": False,
+        "error": result.get("error", "EFI generation aborted"),
+        "efi_status": result.get("efi_status", "FAILED"),
+        "generation_report": result.get("generation_report"),
+    }, "Errore")
+    if not out.json_output:
+        _print_report_generation(result)
+        print("\nEFI STATUS: FAILED")
+        print("EFI generation aborted.")
     return result

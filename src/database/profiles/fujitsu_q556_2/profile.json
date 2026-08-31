@@ -117,14 +117,10 @@
     "OpenLinuxBoot"
   ],
   "required_ssdts": [
-    "SSDT-PLUG",
-    "SSDT-EC-USBX",
-    "SSDT-AWAC",
-    "SSDT-PMC"
+    "SSDT-PLUG-DRTNIA",
+    "SSDT-EC-USBX-DESKTOP"
   ],
-  "optional_ssdts": [
-    "SSDT-RHUB"
-  ],
+  "optional_ssdts": [],
   "device_properties": {
     "PciRoot(0x0)/Pci(0x2,0x0)": {
       "AAPL,ig-platform-id": "00001219",
