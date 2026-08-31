@@ -2,7 +2,7 @@
 
 > *"Basta EFI finte che non bootano nemmeno a pagarle"*
 
-Ciao! Sono Andrea, e questo è **OpenHackintosh** - il tool che crea EFI Hackintosh **vere** che bootano davvero.
+Ciao! Sono Andrea, e questo è **OpenHackintosh** - il tool che crea EFI Hackintosh .
 
 ### La storia (veloce, promesso)
 
