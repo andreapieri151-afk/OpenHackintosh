@@ -83,6 +83,12 @@ def build_efi(
     else:
         result["generation_report"] = {
             "status": "FAILED",
+            "profile": profile.name,
+            "state": profile.state,
+            "checks": {},
+            "acpi": [],
+            "drivers": [],
+            "kexts": [],
             "errors": [result.get("error", "Build failed before final audit")],
         }
         result["efi_status"] = "FAILED"
