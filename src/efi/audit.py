@@ -111,12 +111,26 @@ def final_audit(efi_root: Path, profile: HardwareProfile,
         errors.extend(validation.get("errors", []))
     warnings.extend(validation.get("warnings", []))
 
-    # 5. Required components
-    required_present = (
-        len(selection.required_kexts) + len(selection.required_drivers)
-        + len(selection.required_ssdts)
-    ) > 0
-    checks["required_components"] = required_present and not errors
+    # 5. Required components (indipendente dagli altri errori)
+    required_missing: List[str] = []
+    for kext in selection.required_kexts:
+        bundle = KEXT_BUNDLES.get(kext, kext if kext.endswith(".kext") else kext + ".kext")
+        res = validate_kext(efi_root / "OC" / "Kexts" / bundle)
+        if not res.ok:
+            required_missing.append(bundle)
+            errors.append(f"Required kext missing/invalid: {bundle} ({res.reason})")
+    for driver in selection.required_drivers:
+        fname = DRIVER_FILES.get(driver, driver if driver.endswith(".efi") else driver + ".efi")
+        res = validate_efi_binary(efi_root / "OC" / "Drivers" / fname)
+        if not res.ok:
+            required_missing.append(fname)
+            errors.append(f"Required driver missing/invalid: {fname} ({res.reason})")
+    for ssdt in selection.required_ssdts:
+        res = validate_aml_file(efi_root / "OC" / "ACPI" / f"{ssdt}.aml")
+        if not res.ok:
+            required_missing.append(f"{ssdt}.aml")
+            errors.append(f"Required ACPI missing/invalid: {ssdt}.aml ({res.reason})")
+    checks["required_components"] = not required_missing
 
     # Integrità / report data
     integrity = collect_integrity_records(efi_root, selection.to_dict())

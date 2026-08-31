@@ -12,18 +12,20 @@ from cli.output import Out
 
 def _print_report_generation(result: dict) -> None:
     report = result.get("generation_report") or {}
+    detail = report.get("report") or {}
     print("\nOpenHackintosh EFI Generator")
     print("============================")
+    print("Status (audit):", report.get("status", "-"))
     print("Profile:", report.get("profile", "-"))
-    print("Status:", report.get("state", "-"))
+    print("Profile state:", report.get("state", "-"))
     print("\nACPI:")
-    for status, name in report.get("acpi", []):
+    for status, name in detail.get("acpi", []):
         print(f"  {'OK' if status == 'ok' else 'FAIL'} {name}")
     print("Drivers:")
-    for status, name in report.get("drivers", []):
+    for status, name in detail.get("drivers", []):
         print(f"  {'OK' if status == 'ok' else 'FAIL'} {name}")
     print("Kexts:")
-    for status, name in report.get("kexts", []):
+    for status, name in detail.get("kexts", []):
         print(f"  {'OK' if status == 'ok' else 'FAIL'} {name}")
     print("\nValidation:")
     checks = report.get("checks", {})
@@ -80,6 +82,7 @@ def run_generate(args, out: Out) -> dict:
         include_bluetooth=args.bluetooth,
         include_nvme=args.include_nvme,
         include_restrict_events=args.include_restrict_events,
+        include_optional_drivers=args.include_optional_drivers,
         generate_zip=not args.no_zip,
         strict=True,
         dev=args.dev,
