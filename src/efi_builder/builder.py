@@ -333,6 +333,8 @@ Fatta con ❤️ e bestemmie davanti a un Q556/2 che non bootava
         self.log(f"Prometto: file veri, non finti come prima")
 
         if selection is None:
+            # Fallback legacy (build_efi passa sempre una ComponentSelection).
+            # Qui NON si aggiungono NVMeFix/RestrictEvents "just in case".
             selection = ComponentSelection(
                 required_kexts=get_kexts_for_profile(profile_name, include_wifi, include_bluetooth),
                 required_drivers=["HfsPlus", "OpenRuntime"],
