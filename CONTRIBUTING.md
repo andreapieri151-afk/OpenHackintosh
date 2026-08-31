@@ -8,13 +8,10 @@ Ciao! Se vuoi dare una mano a OpenHackintosh, sei il benvenuto. Non serve essere
 git clone https://github.com/andreapieri151-afk/OpenHackintosh.git
 cd OpenHackintosh
 pip install -r requirements.txt
-python3 main.py  # prova GUI
+python3 src/cli.py --list-profiles
 ```
 
-Se la GUI non parte perché manca customtkinter:
-```bash
-pip install customtkinter pillow
-```
+Il tool gira da terminale. `main.py` è solo un wrapper che delega alla CLI.
 
 ## Cosa puoi fare
 
@@ -60,9 +57,9 @@ KEXTS["MioKext"] = {
 
 Il downloader lo scaricherà da GitHub release.
 
-### 3. Migliorare la GUI
+### 3. Migliorare la CLI
 
-La GUI è in `src/gui/app.py` con customtkinter. Se hai idee per renderla più bella o più usabile, fai pure. Io ho fatto del mio meglio ma non sono un designer.
+La CLI è in `src/cli/` (package). Se hai idee per renderla più chiara, con più opzioni o con output migliore, fai pure. La release 2.0.2 è solo terminale, quindi la CLI è la faccia principale del tool.
 
 ### 4. Fixare bug
 
@@ -80,25 +77,27 @@ Se hai risolto un problema strano con Q556/2, scrivi una guida in `docs/`. Io ho
 
 ```
 src/efi_builder/
-  hardware.py       -> Profili PC, kext, driver, SSDT
+  hardware.py       -> Profili PC (legacy), kext, driver, SSDT
   downloader.py     -> Scarica file veri da GitHub (quello che fixa i file finti)
   config_generator.py -> Genera config.plist per Skylake
   smbios.py         -> Genera seriali a caso
-  builder.py        -> Mette tutto insieme e fa ZIP
-  validator.py      -> Controlla se EFI è finta
+  builder.py        -> Mette tutto insieme e fa ZIP (hardware-aware)
+  validator.py      -> Validazione EFI avanzata (placeholder/missing/0-byte)
 
-src/gui/
-  app.py            -> GUI bella con customtkinter
+src/hardware/       -> Hardware detection + identification
+src/database/       -> Profili JSON (hardware_profiles/), loader, matcher
+src/compatibility/  -> Compatibility Engine (deterministico, non AI)
+src/efi/            -> Selezione componenti + generator hardware-aware
+src/ai/             -> Layer di spiegazione sopra il Compatibility Engine
+src/cli/            -> CLI: commands/, interactive UI, output JSON/testo
 
-src/cli.py          -> CLI per chi ama terminale
-app.py              -> Web dashboard Flask
-templates/index.html -> HTML della web dashboard
+main.py             -> Wrapper che gira la CLI (entry point terminal)
 ```
 
 ## Regole (poche)
 
 - **File veri, non finti**: Se aggiungi qualcosa, scaricalo da fonte ufficiale, non creare placeholder vuoti. Ho già dato con i file finti.
-- **Testa prima di fare PR**: Lancia `python3 main.py` o `python3 src/cli.py --help` e vedi se non crasha.
+- **Testa prima di fare PR**: Lancia `python3 src/cli.py --help` e vedi se non crasha.
 - **Scrivi umano**: Nei log, nei messaggi, nei commenti, scrivi come parleresti a un amico, non come un manuale tecnico. Tipo "Sto scaricando OpenCore vero..." non "Downloading OpenCore...".
 - **Non rompere Q556/2**: Se aggiungi roba per altri PC, assicurati che Q556/2 continui a funzionare. È il profilo principale, quello che ho io.
 

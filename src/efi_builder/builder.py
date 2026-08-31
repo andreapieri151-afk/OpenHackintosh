@@ -10,8 +10,14 @@ import plistlib
 
 from .hardware import PROFILES, KEXTS, DRIVERS, SSDTs, get_kexts_for_profile, Q556_2
 from .downloader import EFIDownloader
+from efi.selection import ComponentSelection, KEXT_BUNDLES
 from .smbios import generate_smbios
 from .config_generator import generate_config, save_config
+
+
+class BuildError(RuntimeError):
+    """Errore bloccante: un componente obbligatorio non e' disponibile."""
+
 
 class EFIBuilder:
     def __init__(self, output_dir: Path, progress_callback: Optional[Callable] = None):
@@ -62,97 +68,120 @@ class EFIBuilder:
         else:
             self.log("✗ Preparazione OpenCore fallita")
         return success
+
+    def filter_drivers(self, allowed_files: List[str]) -> None:
+        """Rimuove i driver UEFI non necessari (whitelist)."""
+        drivers_dir = self.efi_root / "OC" / "Drivers"
+        if not drivers_dir.exists():
+            return
+        allowed = set(allowed_files)
+        for f in drivers_dir.glob("*.efi"):
+            if f.name not in allowed:
+                self.log(f"  - Driver rimosso (non necessario): {f.name}")
+                f.unlink(missing_ok=True)
+
+    def validate_critical_components(self, required_kexts: List[str]) -> Dict[str, bool]:
+        """Verifica che i kext obbligatori siano davvero presenti e non vuoti."""
+        kexts_dir = self.efi_root / "OC" / "Kexts"
+        results = {}
+        for kext_name in required_kexts:
+            bundle_name = KEXT_BUNDLES.get(kext_name, kext_name)
+            kext_path = kexts_dir / bundle_name
+            info = kext_path / "Contents" / "Info.plist" if kext_path.exists() else None
+            ok = bool(info and info.exists() and info.stat().st_size > 0)
+            results[kext_name] = ok
+            if not ok:
+                self.log(f"  ✗ Manca componente obbligatorio: {kext_name} ({bundle_name})")
+        return results
+
+    def ensure_no_placeholders(self) -> List[str]:
+        """Controlla che nessun file nell'EFI sia vuoto o contenga segnaposto."""
+        problems: List[str] = []
+        if not self.efi_root.exists():
+            return problems
+        placeholder_texts = (b"placeholder", b"fake", b"0 byte", b"TODO")
+        for path in self.efi_root.rglob("*"):
+            if not path.is_file():
+                continue
+            if path.stat().st_size == 0:
+                problems.append(str(path))
+                continue
+            if path.suffix.lower() in (".aml", ".plist", ".txt", ".kext"):
+                try:
+                    head = path.read_bytes()[:512]
+                    if any(p.lower() in head.lower() for p in placeholder_texts):
+                        problems.append(str(path))
+                except Exception:
+                    pass
+        return problems
     
-    def download_kexts(self, profile_name: str, include_wifi: bool = False, include_bluetooth: bool = False) -> Dict[str, bool]:
-        """Download kexts for profile"""
-        kext_list = get_kexts_for_profile(profile_name, include_wifi, include_bluetooth)
+    def download_kexts(self, profile_name: str, include_wifi: bool = False,
+                       include_bluetooth: bool = False, kext_list: Optional[List[str]] = None) -> Dict[str, bool]:
+        """Download kexts for profile. Se kext_list e' dato, scarica solo quelli."""
+        if kext_list is None:
+            kext_list = get_kexts_for_profile(profile_name, include_wifi, include_bluetooth)
         self.log(f"🔌 Scarico kext per {profile_name}: {', '.join(kext_list)}")
         self.log(f"   (tutti da GitHub ufficiale, con binari veri dentro)")
-        
+
         kexts_dir = self.efi_root / "OC" / "Kexts"
         results = self.downloader.download_all_kexts(kext_list, KEXTS, kexts_dir)
-        
+
         for kext, ok in results.items():
             if ok:
                 self.log(f"  ✓ {kext} - scaricato vero, non finto")
             else:
-                self.log(f"  ✗ {kext} - fallito, poi riproviamo")
-        
+                self.log(f"  ✗ {kext} - fallito")
         return results
     
-    def create_ssdts(self):
-        """Create SSDTs - using Dortania prebuilt or generate placeholder that is valid"""
-        self.log("🧩 Creo SSDT per Q556/2 (Skylake) - presi da Dortania, non inventati...")
+    def create_ssdts(self, ssdt_names=None, required_ssdts=None):
+        """Create SSDTs from Dortania. Mai placeholder vuoti."""
+        names = ssdt_names or list(SSDTs.keys())
+        required = set(required_ssdts or [])
+        self.log("🧩 Creo SSDT da Dortania, niente placeholder...")
         acpi_dir = self.efi_root / "OC" / "ACPI"
-        
-        # We will try to download SSDTs from Dortania or create minimal valid AML
-        # For now, create README and try to download from OpenCore or generate
-        
-        # Check if we have SSDTs from OpenCore package or download
-        # Use prebuilt SSDTs from Dortania's repo via GitHub
-        # For simplicity, we create valid SSDTs using known working binaries
-        # We'll download from https://github.com/dortania/Getting-Started-With-ACPI
-        # But for offline, we create placeholder AML files that are actually valid?
-        # Better to include source and compile or download real ones
-        
-        # Let's download SSDT prebuilts from dortania
-        ssdts_to_get = ["SSDT-PLUG", "SSDT-EC-USBX", "SSDT-AWAC", "SSDT-PMC"]
-        
-        # Try to download from acidanthera or dortania
-        # We'll use OpCore-Simplify's SSDT approach: download from GitHub
+        acpi_dir.mkdir(parents=True, exist_ok=True)
+
         base_url = "https://raw.githubusercontent.com/dortania/Getting-Started-With-ACPI/master/extra-files/compiled/"
-        
+        urls_tpl = [
+            f"{base_url}{name}.aml",
+            f"https://raw.githubusercontent.com/dortania/OpenCore-Install-Guide/master/extra-files/compiled/{name}.aml",
+            f"https://github.com/dortania/Getting-Started-With-ACPI/raw/master/extra-files/compiled/{name}.aml",
+        ]
+
         import requests
-        
-        for ssdt_name in ssdts_to_get:
+
+        missing: List[str] = []
+        for ssdt_name in names:
             dest = acpi_dir / f"{ssdt_name}.aml"
-            # Try multiple sources
-            urls = [
-                f"{base_url}{ssdt_name}.aml",
-                f"https://raw.githubusercontent.com/dortania/OpenCore-Install-Guide/master/extra-files/compiled/{ssdt_name}.aml",
-                f"https://github.com/dortania/Getting-Started-With-ACPI/raw/master/extra-files/compiled/{ssdt_name}.aml"
-            ]
-            
-            downloaded = False
-            for url in urls:
+            if dest.exists() and dest.stat().st_size > 0:
+                self.log(f"  ✓ {ssdt_name}.aml già presente")
+                continue
+            for url in urls_tpl:
                 try:
                     r = requests.get(url, timeout=10)
                     if r.status_code == 200 and len(r.content) > 100:
-                        with open(dest, 'wb') as f:
-                            f.write(r.content)
-                        self.log(f"  ✓ {ssdt_name}.aml downloaded")
-                        downloaded = True
+                        dest.write_bytes(r.content)
+                        self.log(f"  ✓ {ssdt_name}.aml scaricato")
                         break
-                except Exception as e:
+                except Exception:
                     continue
-            
-            if not downloaded:
-                self.log(f"  ! {ssdt_name}.aml - non scaricato, creo placeholder (poi lo sostituisci a mano se serve)")
-                if not dest.exists():
-                    dest.write_bytes(b"")  # Will be handled
-        
-        # If still empty, try to use bundled SSDTs from assets
-        assets_acpi = Path(__file__).parent.parent.parent / "assets" / "acpi"
-        if assets_acpi.exists():
-            for aml in assets_acpi.glob("*.aml"):
-                shutil.copy2(aml, acpi_dir / aml.name)
-                self.log(f"  ✓ {aml.name} from assets")
-        
-        existing = list(acpi_dir.glob("*.aml"))
-        if not existing:
-            self.log("  ! Nessun SSDT scaricato, creo guida")
-            (acpi_dir / "README.txt").write_text(
-                "SSDT mancanti? Scaricali da Dortania:\n"
-                "Per Q556/2 servono:\n"
-                "- SSDT-PLUG.aml (CPU)\n"
-                "- SSDT-EC-USBX.aml (EC fix)\n"
-                "- SSDT-AWAC.aml (RTC)\n"
-                "- SSDT-PMC.aml (NVRAM H110)\n"
-                "\n"
-                "https://github.com/dortania/Getting-Started-With-ACPI/tree/master/extra-files/compiled\n"
+            else:
+                missing.append(ssdt_name)
+                self.log(f"  ✗ {ssdt_name}.aml - download fallito")
+
+        # Se un SSDT obbligatorio manca -> errore bloccante, MAI placeholder
+        required_missing = [n for n in missing if n in required]
+        if required_missing:
+            raise BuildError(
+                "EFI generation aborted. Failed to download required SSDT(s): "
+                + ", ".join(required_missing)
             )
-        else:
-            self.log(f"✓ {len(existing)} SSDT pronti - presi da Dortania, non inventati")
+
+        if missing:
+            self.log(f"  ! SSDT opzionali mancanti: {', '.join(missing)}")
+
+        existing = [p.name for p in acpi_dir.glob("*.aml") if p.stat().st_size > 0]
+        self.log(f"✓ {len(existing)} SSDT pronti (solo file reali, mai vuoti)")
     
     def generate_config_plist(self, profile_name: str, smbios_model: str, audio_layout: int, macos_version: str, smbios_data: Optional[Dict] = None):
         """Generate config.plist"""
@@ -274,45 +303,70 @@ Fatta con ❤️ e bestemmie davanti a un Q556/2 che non bootava
         macos_version: str = "Ventura 13.x",
         include_wifi: bool = False,
         include_bluetooth: bool = False,
-        generate_zip: bool = True
+        generate_zip: bool = True,
+        selection: Optional[ComponentSelection] = None,
+        strict: bool = True
     ) -> Dict:
-        """Full build process"""
+        """Full build process, hardware-aware e strict."""
         self.log(f"=== 🚀 Creo EFI per {profile_name} ===")
         self.log(f"Obiettivo: {macos_version} / {smbios_model} / audio layout {audio_layout}")
         self.log(f"Prometto: file veri, non finti come prima")
-        
+
+        if selection is None:
+            selection = ComponentSelection(
+                required_kexts=get_kexts_for_profile(profile_name, include_wifi, include_bluetooth),
+                required_drivers=["HfsPlus", "OpenRuntime"],
+                required_ssdts=list(SSDTs.keys()),
+            )
+
         self.create_structure()
-        
+
         if not self.download_opencore():
             return {"success": False, "error": "OpenCore download failed", "logs": self.logs}
-        
-        kext_results = self.download_kexts(profile_name, include_wifi, include_bluetooth)
-        
-        critical = ["Lilu", "VirtualSMC", "WhateverGreen", "AppleALC"]
-        failed_critical = [k for k in critical if not kext_results.get(k, False)]
-        if failed_critical:
-            self.log(f"! Attenzione: kext importanti falliti: {failed_critical} - senza questi non boota")
-        
-        self.create_ssdts()
-        
+
+        self.filter_drivers(selection.driver_files())
+        kext_results = self.download_kexts(profile_name, include_wifi, include_bluetooth, kext_list=selection.kexts())
+
+        failed_required = [k for k in selection.required_kexts if not kext_results.get(k, False)]
+        if failed_required:
+            msg = "EFI generation aborted. Required component unavailable: " + ", ".join(failed_required)
+            self.log("✗ " + msg)
+            if strict:
+                return {"success": False, "error": msg, "logs": self.logs}
+
+        try:
+            self.create_ssdts(selection.ssdts(), selection.required_ssdts)
+        except BuildError as exc:
+            self.log("✗ " + str(exc))
+            if strict:
+                return {"success": False, "error": str(exc), "logs": self.logs}
+
         smbios_data, config = self.generate_config_plist(profile_name, smbios_model, audio_layout, macos_version)
-        
+
         self.create_readme(profile_name, macos_version, smbios_model)
-        
+
+        placeholders = self.ensure_no_placeholders()
+        if placeholders:
+            msg = "EFI generation aborted. Placeholder/empty files detected: " + ", ".join(placeholders[:5])
+            self.log("✗ " + msg)
+            if strict:
+                return {"success": False, "error": msg, "logs": self.logs}
+
         zip_path = None
         if generate_zip:
             zip_path = self.create_zip()
-        
+
         self.log("=== 🎉 Fatto! EFI pronta! ===")
         self.log("Ora copia la cartella EFI sulla chiavetta e prova a bootare")
         self.log("Se non boota, 99% è il BIOS - controlla DVMT 64MB!")
-        
+
         return {
             "success": True,
             "efi_path": str(self.efi_root),
             "zip_path": str(zip_path) if zip_path else None,
             "smbios": smbios_data,
             "kext_results": kext_results,
+            "selection": selection.to_dict(),
             "logs": self.logs
         }
     

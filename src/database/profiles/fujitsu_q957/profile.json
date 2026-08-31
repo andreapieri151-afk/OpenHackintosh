@@ -1,0 +1,132 @@
+{
+  "id": "fujitsu_q957",
+  "name": "Fujitsu Esprimo Q957",
+  "manufacturer": "Fujitsu",
+  "model": "Esprimo Q957",
+  "aliases": ["Q957", "Q957/2", "Esprimo Q957"],
+  "board": {
+    "vendor": "Fujitsu",
+    "name": "D3403-U2 / D3600",
+    "aliases": ["D3403-U2", "D3600"]
+  },
+  "chipset": "Intel Q270 / H110",
+  "cpu": {
+    "generations": ["Kaby Lake (7th Gen)", "Coffee Lake (8th/9th) with mod"],
+    "notes": "7th gen nativo; 8th/9th solo con microcode/modifiche."
+  },
+  "gpu": {
+    "igpu": "Intel HD Graphics 630",
+    "ids": ["8086:5912", "8086:591E", "8086:3E90", "8086:3E9B"],
+    "framebuffer": {
+      "kaby": {
+        "AAPL,ig-platform-id": "00001259",
+        "device-id": "12590000",
+        "framebuffer-patch-enable": "01000000",
+        "framebuffer-stolenmem": "00003001",
+        "framebuffer-fbmem": "00009000"
+      }
+    }
+  },
+  "audio": {
+    "codec": "Realtek ALC671 / ALC255",
+    "layout_ids": [11, 13, 15, 21],
+    "default_layout": 11
+  },
+  "ethernet": {
+    "chip": "Intel I219-LM/V",
+    "ids": ["8086:15b8", "8086:15bc", "8086:15d8"],
+    "kext": "IntelMausi.kext"
+  },
+  "wifi": {
+    "hardware": "Intel Wireless-AC / AX (optional)",
+    "ids": [],
+    "kext": "AirportItlwm.kext",
+    "notes": "Opzionale."
+  },
+  "bluetooth": {
+    "hardware": "Intel Bluetooth (optional)",
+    "ids": [],
+    "kext": "IntelBluetoothFirmware.kext",
+    "notes": "Opzionale."
+  },
+  "usb": {
+    "notes": "Port USB2/USB3; mappare con USBToolBox dopo l'installazione.",
+    "xhc_port_limit": true
+  },
+  "storage": {
+    "notes": "SATA / NVMe via PCIe."
+  },
+  "smbios": {
+    "recommended": ["iMac18,1", "iMac19,1", "Macmini8,1", "iMacPro1,1"],
+    "default": "iMac18,1",
+    "for_sonoma_sequoia": ["iMacPro1,1", "Macmini8,1"]
+  },
+  "required_kexts": ["Lilu", "VirtualSMC", "WhateverGreen", "AppleALC", "IntelMausi"],
+  "optional_kexts": ["NVMeFix", "RestrictEvents", "AirportItlwm", "IntelBluetoothFirmware", "USBToolBox"],
+  "required_drivers": ["HfsPlus", "OpenRuntime"],
+  "optional_drivers": ["OpenCanopy", "ResetNvramEntry", "OpenLinuxBoot"],
+  "required_ssdts": ["SSDT-PLUG", "SSDT-EC-USBX", "SSDT-AWAC", "SSDT-PMC"],
+  "optional_ssdts": ["SSDT-RHUB"],
+  "device_properties": {
+    "PciRoot(0x0)/Pci(0x2,0x0)": {
+      "AAPL,ig-platform-id": "00001259",
+      "device-id": "12590000",
+      "framebuffer-patch-enable": "01000000",
+      "framebuffer-stolenmem": "00003001",
+      "framebuffer-fbmem": "00009000"
+    }
+  },
+  "booter_quirks": {
+    "AvoidRuntimeDefrag": true,
+    "EnableWriteUnprotector": true,
+    "ProvideCustomSlide": true,
+    "RebuildAppleMemoryMap": true,
+    "SetupVirtualMap": true,
+    "SyncRuntimePermissions": true
+  },
+  "kernel_quirks": {
+    "AppleXcpmCfgLock": true,
+    "DisableIoMapper": true,
+    "DisableLinkeditJettison": true,
+    "PanicNoKextDump": true,
+    "PowerTimeoutKernelPanic": true
+  },
+  "nvram": {
+    "boot-args": "alcid=11",
+    "notes": "boot-args di debug NON inclusi di default in release."
+  },
+  "uefi": {
+    "quirks": {
+      "ReleaseUsbOwnership": true,
+      "RequestBootVarRouting": true,
+      "EnableVectorAcceleration": true
+    }
+  },
+  "macos_compatibility": {
+    "Monterey 12.x": {"status": "documented", "smbios": ["iMac17,1", "iMac18,1", "iMacPro1,1"]},
+    "Ventura 13.x": {"status": "documented", "smbios": ["iMac18,1", "iMac19,1", "Macmini8,1", "iMacPro1,1"]},
+    "Sonoma 14.x": {"status": "documented", "smbios": ["iMacPro1,1", "Macmini8,1", "iMac19,1"]},
+    "Sequoia 15.x": {"status": "unknown", "requires_hardware_testing": true}
+  },
+  "bios_configuration": [
+    {"name": "Secure Boot", "value": "Disable", "required": true, "verified": true},
+    {"name": "CSM", "value": "Disable", "required": true, "verified": true},
+    {"name": "Fast Boot", "value": "Disable", "required": true, "verified": true},
+    {"name": "VT-d", "value": "Disable", "required": true, "verified": true},
+    {"name": "VT-x", "value": "Enable", "required": true, "verified": true},
+    {"name": "Above 4G", "value": "Enable", "required": true, "verified": true},
+    {"name": "DVMT Pre-Allocated", "value": "64MB", "required": true, "verified": true},
+    {"name": "CFG Lock", "value": "Disable", "required": false, "verified": false, "note": "Requires hardware verification"}
+  ],
+  "compatibility": {
+    "state": "DOCUMENTED",
+    "verified_by": null,
+    "notes": "Basato su documentazione e somiglianza con Q556/2. Non testato su hardware reale da OpenHackintosh.",
+    "requires_hardware_testing": true
+  },
+  "limitations": [
+    "Non verificato realmente; richiede test su hardware fisico.",
+    "Coffee Lake 8th/9th richiede modifiche non ancora verificate."
+  ],
+  "notes": "Profilo documentato, non ancora verificato su hardware reale."
+}

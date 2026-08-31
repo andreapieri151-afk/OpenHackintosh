@@ -1,5 +1,32 @@
 # Changelog - Tutte le bestemmie in ordine cronologico
 
+## [Unreleased] - 2026-08-30 - v2.0.2 in preparazione (NON PUBBLICATA)
+
+### Rimosso GUI e Web Dashboard: solo terminale
+
+- Rimosso `src/gui/` (GUI customtkinter/tkinter)
+- Rimosso `app.py`, `run_web.py`, `templates/`, `static/` (Web Dashboard Flask)
+- `main.py` ora è un wrapper che gira direttamente la CLI
+- `src/cli.py`: rimossa opzione `--gui`, epilog aggiornato
+- `FujitsuEFI.command`: avvio diretto da terminale, niente più tentativo GUI
+- `requirements.txt`: rimossi `flask`, `customtkinter`, `pillow`, `packaging`; resta `requests`
+- README, CONTRIBUTING, `.github/DESCRIPTION.md` aggiornati: il progetto è CLI-only
+
+### Fondazione intelligente (2.0.2)
+
+- **Hardware Detection** (`src/hardware/detection.py`): rileva DMI, CPU, GPU/PCI, audio, Ethernet, WiFi, USB, storage, ACPI; MAI inventa, altrimenti "Unknown / Not detected".
+- **Hardware Identification** (`src/hardware/identification.py`): identità confrontabile.
+- **Hardware Database JSON** (`src/database/profiles/`): profili `fujitsu_q556_2` e `fujitsu_q957` con stato VERIFIED / DOCUMENTED / UNKNOWN.
+- **Database Loader + Matcher** (`src/database/`): caricamento autonomo e matching deterministico per modello/board/HW ID.
+- **Compatibility Engine** (`src/compatibility/`): confronto hardware vs profilo con stati compatible/partial/unsupported/unknown. Non usa AI per decidere.
+- **AI Layer** (`src/ai/`): solo spiegazione sopra il risultato del motore.
+- **EFI Generator hardware-aware** (`src/efi/` + `src/efi_builder/builder.py`): include solo componenti necessari; il download di un componente obbligatorio che fallisce ABORTA, non crea placeholder.
+- **EFI Validator avanzato** (`src/efi_builder/validator.py`): rileva 0-byte, placeholder, missing, componenti configurati ma assenti, config/file inconsistency.
+- **CLI commands**: `detect`, `info`, `diagnose`, `compatibility`, `generate`, `validate`, `doctor`, `database`, `bios`, `ask`.
+- **Output JSON** su tutti i comandi principali; `--dev` per verbose/debug.
+- **Guida BIOS per profilo**: `openhackintosh bios --profile fujitsu_q556_2`, solo impostazioni pertinenti, con "requires hardware verification".
+- **Tests pytest** (24): detection, database, matching, compatibility, validator 0-byte/placeholder/missing, CLI JSON, reference Q556/2.
+
 ## [2.1.0] - 2026-08-29 - OpenHackintosh 🍎
 
 ### Perché ho cambiato nome?

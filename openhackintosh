@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# OpenHackintosh CLI launcher
+cd "$(dirname "$0")"
+
+if [ ! -d .venv ]; then
+  python3 -m venv .venv
+fi
+
+# Best effort: installa requirements se manca requests
+if ! .venv/bin/python -c "import requests" 2>/dev/null; then
+  .venv/bin/pip install -q -r requirements.txt 2>/dev/null || true
+fi
+
+exec .venv/bin/python main.py "$@"

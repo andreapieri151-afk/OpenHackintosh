@@ -18,7 +18,7 @@ Così l'ho riscritto da zero, ma **per bene**. Con file veri scaricati da GitHub
 
 ## Cosa fa, in pratica?
 
-Tu scegli il tuo PC, clicchi un bottone, lui fa tutto:
+Tu scrivi un comando da terminale, lui fa tutto:
 
 1. **Scarica OpenCore vero** da Acidanthera (non un file di testo rinominato .efi)
 2. **Scarica i kext veri** - Lilu, VirtualSMC, WhateverGreen, AppleALC... con i binari dentro
@@ -72,54 +72,59 @@ Li aggiungo in ordine di richiesta.
 
 L'idea è fare un **tool universale** che non sia legato a un solo PC. Un posto dove:
 
-- Scegli il tuo hardware da una lista
+- Rileva il tuo hardware da solo (se possibile)
+- Scegli/identifica il profilo dal database
 - Scegli macOS target
-- Clicchi e ti fa EFI vera con download ufficiali
+- Esegui un comando e ti genera EFI vera con download ufficiali
 - Non devi più cercare kext a mano
 
-Un po' come OpCore-Simplify ma più semplice, più umano, con GUI bella e con focus su mini PC (che sono i migliori per Hackintosh secondo me - piccoli, silenziosi, consumano poco).
+Un po' come OpCore-Simplify ma più semplice, più umano, con CLI chiara e con focus su mini PC (che sono i migliori per Hackintosh secondo me - piccoli, silenziosi, consumano poco).
 
 ---
 
-## Come si usa? (3 modi)
+## Come si usa? (da terminale)
+
+La 2.0.2 è **solo terminale**: ho tolto GUI e Web Dashboard per mantenere il tool semplice, testabile e senza dipendenze inutili.
 
 ### 1. Doppio click su macOS (il più facile)
 
-Scarica release, scompatta, doppio click su `FujitsuEFI.command` (lo rinominerò in OpenHackintosh.command presto). Se mancano dipendenze te le installa da solo.
+Scarica release, scompatta, doppio click su `FujitsuEFI.command` (lo rinominerò in OpenHackintosh.command presto). Apre il terminale, installa le dipendenze se servono, elenca i profili disponibili.
 
-### 2. GUI Python
+### 2. Terminale (interfaccia principale)
 
 ```bash
 git clone https://github.com/andreapieri151-afk/OpenHackintosh.git
 cd OpenHackintosh
 pip install -r requirements.txt
+
+# Menu interattivo
 python3 main.py
+
+# Rileva hardware reale
+python3 main.py detect
+
+# Diagnosi completa (hardware + compatibilità + spiegazione)
+python3 main.py diagnose
+
+# Controlla compatibilità con il database
+python3 main.py compatibility
+
+# Genera EFI hardware-aware
+python3 main.py generate
+
+# Valida una EFI già generata
+python3 main.py validate output/EFI
+
+# Profili database
+python3 main.py database list
+python3 main.py database show fujitsu_q556_2
+
+# Output JSON (per script/CI/AI)
+python3 main.py diagnose --json
+python3 main.py detect --json
 ```
 
-Scegli PC, macOS (Ventura consigliato per Q556/2), SMBIOS (iMac18,1 per iniziare), audio layout (11 di solito va), clicchi "Crea EFI vera, non finta". Vedi log live e ZIP finale.
-
-### 3. Terminale (per chi si sente hacker)
-
-```bash
-# Vedi cosa supporta ora
-python3 src/cli.py --list-profiles
-
-# EFI base Q556/2 Ventura
-python3 src/cli.py --profile Q556/2 --macos "Ventura 13.x" --smbios iMac18,1
-
-# EFI Sonoma con WiFi Intel
-python3 src/cli.py --profile Q556/2 --macos "Sonoma 14.x" --smbios iMacPro1,1 --wifi --bluetooth
-
-# Per Q957
-python3 src/cli.py --profile Q957 --macos "Ventura 13.x"
-```
-
-### 4. Web (Linux o per fare il figo)
-
-```bash
-python3 app.py
-# http://localhost:5000
-```
+Tutte le opzioni sono visibili con `python3 main.py --help`.
 
 ---
 
@@ -188,11 +193,18 @@ Tutti da GitHub ufficiale.
 ## Roadmap
 
 - [x] Fix file finti -> file veri
-- [x] GUI decente
-- [x] CLI e Web Dashboard
+- [x] CLI chiara e usabile da terminale
 - [x] Supporto Q556/2 e Q957
 - [x] Rinominato OpenHackintosh (da tool singolo a universale)
 - [x] README più umano
+- [x] Rimossa GUI e Web Dashboard (v2.0.2: solo terminale)
+- [x] Hardware Detection (`hardware/detection.py`)
+- [x] Hardware Database JSON (`database/profiles/`)
+- [x] Compatibility Engine deterministico (`compatibility/`)
+- [x] CLI commands: detect, info, diagnose, compatibility, generate, validate, doctor, database
+- [x] Output JSON su tutti i comandi principali
+- [x] EFI validator avanzato (0-byte / placeholder / missing / config consistency)
+- [x] Test automatici base (pytest)
 - [ ] **Nuovi dispositivi nei prossimi giorni** (Q558, Q958, Lenovo Tiny, HP Mini, Dell Micro)
 - [ ] macserial nativo per seriali più furbi
 - [ ] USB mapping automatico
@@ -203,22 +215,16 @@ Tutti da GitHub ufficiale.
 
 ## Come contribuire
 
-Se vuoi aggiungere il tuo PC, è facile:
+Se vuoi aggiungere il tuo PC, è facile (2.0.2 usa un database JSON):
 
-1. Apri `src/efi_builder/hardware.py`
-2. Aggiungi profilo tipo:
+1. Crea una cartella in `src/database/profiles/` (es. `lenovo_m720q/`)
+2. Aggiungi `profile.json` con: manufacturer, model, board, CPU, GPU, audio, LAN, kext/driver/SSDT, SMBIOS, config e stato:
+   - `VERIFIED` (testato davvero)
+   - `DOCUMENTED` (da documentazione)
+   - `UNSUPPORTED` / `UNKNOWN`
+3. Fai PR con modello, board, LAN, audio, CPU e che profilo hai testato davvero.
 
-```python
-MIO_PC = HardwareProfile(
-    name="Lenovo ThinkCentre M720q",
-    board="... ",
-    lan_kext="IntelMausi.kext",
-    ...
-)
-PROFILES["M720q"] = MIO_PC
-```
-
-3. Fai PR con modello, board, LAN, audio, CPU
+Non inventare compatibilità: se non è testato su hardware reale, scrivi `DOCUMENTED`, mai `VERIFIED`.
 
 Oppure apri issue con il tuo hardware e lo aggiungo io nei prossimi giorni.
 

@@ -165,7 +165,7 @@ def create_base_config() -> Dict:
                 },
                 "7C436110-AB2A-4BBB-A880-FE41995C9F82": {
                     "SystemAudioVolume": bytes.fromhex("46"),
-                    "boot-args": "-v keepsyms=1 debug=0x100 alcid=11",
+                    "boot-args": "alcid=11",
                     "csr-active-config": bytes.fromhex("00000000"),
                     "prev-lang:kbd": bytes.fromhex("656E2D55533A30")
                 }
@@ -508,9 +508,12 @@ def set_smbios(config: Dict, smbios_data: Dict) -> Dict:
     
     return config
 
-def set_boot_args(config: Dict, profile_name: str, audio_layout: int = 11, extra_args: str = "") -> Dict:
-    """Set boot-args for Q556/2"""
-    base_args = f"-v keepsyms=1 debug=0x100 alcid={audio_layout}"
+def set_boot_args(config: Dict, profile_name: str, audio_layout: int = 11, extra_args: str = "", dev: bool = False) -> Dict:
+    """Set boot-args for Q556/2. In release niente argomenti di debug."""
+    if dev:
+        base_args = f"-v keepsyms=1 debug=0x100 alcid={audio_layout}"
+    else:
+        base_args = f"alcid={audio_layout}"
     if extra_args:
         base_args += f" {extra_args}"
     
