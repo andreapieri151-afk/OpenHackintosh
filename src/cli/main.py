@@ -107,19 +107,20 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def run_ask(args, out: Out) -> dict:
-    from hardware import detect_all, identify
-    from database import load_all_profiles
-    from compatibility import CompatibilityEngine
+    from hardware import detect_and_capture
     from ai import Assistant
 
-    info = detect_all()
-    identity = identify(info)
-    engine = CompatibilityEngine(load_all_profiles())
-    result = engine.analyze(identity=identity, info=info)
+    snapshot = detect_and_capture()
+    result = snapshot.result
     question = " ".join(args.question) or "Riassunto"
     assistant = Assistant()
     answer = assistant.answer(question, result)
-    payload = {"question": question, "answer": answer, "result": result.to_dict()}
+    payload = {
+        "question": question,
+        "answer": answer,
+        "result": result.to_dict(),
+        "match": snapshot.match.to_dict() if snapshot.match else {"match_type": "NO_MATCH"},
+    }
     out.data(payload, "AI & EFI Assistant")
     return payload
 

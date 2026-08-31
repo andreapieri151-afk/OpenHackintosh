@@ -51,8 +51,8 @@ class HardwareIdentity:
 def _first(d: Dict[str, DetectedValue], *keys: str) -> str:
     for key in keys:
         v = d.get(key)
-        if v and v.value != UNKNOWN:
-            return v.value
+        if v and str(v) != UNKNOWN:
+            return str(v)
     return UNKNOWN
 
 

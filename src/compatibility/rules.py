@@ -51,6 +51,7 @@ class ComponentAssessment:
     status: ComponentStatus = ComponentStatus.UNKNOWN
     detail: str = ""
     optional: bool = False
+    evidence: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -74,6 +75,7 @@ class CompatibilityResult:
             "profile": self.profile.to_dict() if self.profile else None,
             "matching": {
                 "score": self.match.score if self.match else 0,
+                "match_type": self.match.match_type if self.match else "NO_MATCH",
                 "matched_fields": self.match.matched_fields if self.match else [],
                 "reasons": self.match.reasons if self.match else [],
             },
@@ -88,6 +90,38 @@ class CompatibilityResult:
 
 def _has(actual: str) -> bool:
     return bool(actual) and actual.lower() not in (UNKNOWN.lower(), "unknown / not detected")
+
+
+def _evidence_for(assessment: ComponentAssessment, profile: Optional[HardwareProfile]) -> List[str]:
+    """Evidenze deterministiche per un componente. Mai inventate."""
+    if assessment.status == ComponentStatus.UNKNOWN:
+        ev = ["Hardware not detected"]
+        if not assessment.optional:
+            ev.append("No evidence available")
+        ev.append("Requires real hardware testing")
+        return ev
+    if assessment.status == ComponentStatus.PARTIAL:
+        return [
+            "Component detected but differs from profile",
+            "Requires hardware verification",
+        ]
+    if assessment.status == ComponentStatus.UNSUPPORTED:
+        return ["Profile marks this component as unsupported"]
+    # OK
+    ev = ["Detected hardware"]
+    if "Device ID" in assessment.detail:
+        ev.append("Hardware ID match")
+    if assessment.expected:
+        ev.append("Database profile component match")
+    if profile:
+        ev.append("Tested (profile VERIFIED)" if profile.verified else "Documented (not physically verified)")
+    ev.append("No conflicting evidence")
+    return ev
+
+
+def _attach_evidence(assessment: ComponentAssessment, profile: Optional[HardwareProfile]) -> ComponentAssessment:
+    assessment.evidence = _evidence_for(assessment, profile)
+    return assessment
 
 
 def _cpu_matches(expected: str, detected: str) -> bool:
@@ -112,7 +146,8 @@ def _cpu_matches(expected: str, detected: str) -> bool:
     return False
 
 
-def assess_component(name: str, detected_value: str, expected: str) -> ComponentAssessment:
+def assess_component(name: str, detected_value: str, expected: str,
+                     device_id: str = "", profile_ids: Optional[List[str]] = None) -> ComponentAssessment:
     if not _has(detected_value):
         return ComponentAssessment(
             name=name,
@@ -121,6 +156,17 @@ def assess_component(name: str, detected_value: str, expected: str) -> Component
             status=ComponentStatus.UNKNOWN,
             detail="Non rilevato. Require real hardware testing.",
         )
+    # Hardware ID noto e presente nel profilo -> evidenza forte, non testo libero.
+    if device_id and profile_ids:
+        actual = device_id.lower()
+        if any(str(pid).lower() in actual or actual in str(pid).lower() for pid in profile_ids):
+            return ComponentAssessment(
+                name=name,
+                detected=detected_value,
+                expected=expected,
+                status=ComponentStatus.OK,
+                detail=f"Device ID '{device_id}' rientra nel profilo.",
+            )
     if not expected:
         return ComponentAssessment(
             name=name,
@@ -163,12 +209,31 @@ def evaluate(identity: HardwareIdentity, profile: Optional[HardwareProfile],
         ))
     else:
         components.append(assess_component("CPU", identity.cpu, cpu_expected))
-    components.append(assess_component("GPU", identity.gpu, get_profile_gpu(profile)))
-    components.append(assess_component("Audio", identity.audio, get_profile_audio(profile)))
-    components.append(assess_component("Ethernet", identity.ethernet, get_profile_ethernet(profile)))
-    wifi_assessment = assess_component("Wi-Fi", identity.wifi, get_profile_wifi(profile))
+    components.append(assess_component(
+        "GPU", identity.gpu, get_profile_gpu(profile),
+        device_id=identity.gpu_id,
+        profile_ids=profile.gpu.get("ids", []) if profile else [],
+    ))
+    components.append(assess_component(
+        "Audio", identity.audio, get_profile_audio(profile),
+        device_id=identity.audio_id,
+        profile_ids=profile.audio.get("ids", []) if profile else [],
+    ))
+    components.append(assess_component(
+        "Ethernet", identity.ethernet, get_profile_ethernet(profile),
+        device_id=identity.ethernet_id,
+        profile_ids=profile.ethernet.get("ids", []) if profile else [],
+    ))
+    wifi_assessment = assess_component(
+        "Wi-Fi", identity.wifi, get_profile_wifi(profile),
+        device_id=identity.wifi_id,
+        profile_ids=profile.wifi.get("ids", []) if profile else [],
+    )
     wifi_assessment.optional = True
     components.append(wifi_assessment)
+
+    # Evidenze: separate dal verdetto, deterministiche e mai inventate.
+    components = [_attach_evidence(c, profile) for c in components]
 
     unknown_components = [c.name for c in components
                           if c.status == ComponentStatus.UNKNOWN and not c.optional]

@@ -29,7 +29,9 @@ def test_diagnose_json(capsys):
     assert code == 0
     data = json.loads(capsys.readouterr().out)
     assert data["mode"] == "diagnose"
-    assert "computer" in data
+    assert "system" in data
+    assert "cpu" in data and "gpu" in data
+    assert "database" in data and "compatibility" in data
     assert data["overall"] in ("compatible", "partial", "unsupported", "unknown")
 
 

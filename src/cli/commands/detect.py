@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import json
-
 from hardware import detect_all, identify
 from ..output import Out
 
@@ -37,8 +35,8 @@ def run_detect(args, out: Out) -> dict:
     )
 
     pci = info.pci.get("pci_devices", None)
-    if pci and pci.value != "Unknown / Not detected":
-        devices = json.loads(pci.value)
+    if pci and pci.value:
+        devices = pci.value
         rows = [[d.get("class", ""), d.get("description", ""), d.get("id", "")] for d in devices]
         out.table(["Class", "Device", "ID"], rows)
 

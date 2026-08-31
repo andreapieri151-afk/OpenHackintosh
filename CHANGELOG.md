@@ -28,6 +28,17 @@
 - Interfaccia `generate --json` ora produce JSON pulito (log nascosti in json mode).
 - Test di hardening (37 totali) per download failure, fake/invalid binaries, 0-byte, missing kext/driver/ACPI, config mismatch, exit code, Q556/2.
 
+### Hardware Detection / Identification / Diagnosis (2.0.2)
+
+- `DetectedValue` ora espone `value` / `status` / `source`: `DETECTED`, `INFERRED`, `DATABASE_MATCH`, `NOT_DETECTED`, `UNKNOWN`, `NOT_AVAILABLE_ON_PLATFORM`. Se non rilevato: `value: null`.
+- Detection arricchita: CPU vendor/architettura/generazione/cores/threads/features; GPU vendor/model/ids/PCI/type/VRAM best-effort; Audio, Ethernet, Wi-Fi con vendor/model/ids/PCI; Bluetooth best-effort (USB/PCI); USB controllers + devices; Storage SATA/NVMe/drives; ACPI tables + DSDT; boot mode UEFI/Legacy.
+- **HardwareSnapshot** (`src/hardware/snapshot.py`): rileva una sola volta e condivide detection ↔ matching ↔ compatibility.
+- Matcher: `match_type` = `EXACT_MATCH` / `CLOSE_MATCH` / `PARTIAL_MATCH` / `NO_MATCH`.
+- Compatibility: `ComponentAssessment.evidence` (Detected / Hardware ID match / Database profile / Documented / Tested) e `match_type` nel JSON.
+- `openhackintosh diagnose`: report completo (SYSTEM, CPU, GPU, Audio, Ethernet, Wi-Fi, Storage, DATABASE, DIAGNOSIS, macOS Compatibility, Overall, NOTE). `diagnose --json` produce solo JSON.
+- Error handling: la diagnosi continua se una singola sezione di rilevamento fallisce (`detection_errors` tracciato).
+- NON toccato il generatore EFI in questa fase.
+
 ### Fondazione intelligente (2.0.2)
 
 - **Hardware Detection** (`src/hardware/detection.py`): rileva DMI, CPU, GPU/PCI, audio, Ethernet, WiFi, USB, storage, ACPI; MAI inventa, altrimenti "Unknown / Not detected".

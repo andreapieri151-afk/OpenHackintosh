@@ -15,12 +15,19 @@ def test_detect_all_no_throw():
 
 def test_detect_does_not_invent():
     info = detect_all()
-    # Ogni valore deve essere stringa valida (mai None), source sempre noto
+    # Ogni valore deve essere valido; se non rilevato -> value=None + status NOT_DETECTED.
+    allowed_status = ("DETECTED", "INFERRED", "DATABASE_MATCH", "NOT_DETECTED",
+                      "UNKNOWN", "NOT_AVAILABLE_ON_PLATFORM")
+    allowed_source = ("detected", "deduced", "database", "unknown", "platform")
     for section in info.to_dict().values():
         for val in section.values():
-            assert isinstance(val.get("value"), str)
-            assert val["value"]
-            assert val.get("source") in ("detected", "deduced", "unknown")
+            if val.get("status") == "NOT_DETECTED":
+                assert val.get("value") is None
+            else:
+                assert isinstance(val.get("value"), (str, int, list))
+                assert val.get("value") != ""
+            assert val.get("status") in allowed_status
+            assert val.get("source") in allowed_source
 
 
 def test_parse_lspci():

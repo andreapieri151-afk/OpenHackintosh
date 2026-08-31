@@ -1,5 +1,11 @@
 from .detection import (
     UNKNOWN,
+    STATUS_DETECTED,
+    STATUS_INFERRED,
+    STATUS_DATABASE_MATCH,
+    STATUS_NOT_DETECTED,
+    STATUS_UNKNOWN,
+    STATUS_NOT_AVAILABLE,
     DetectedValue,
     HardwareInfo,
     detect_all,
@@ -7,18 +13,32 @@ from .detection import (
     unknown,
     detected,
     deduced,
+    database_match,
+    not_available,
 )
 from .identification import HardwareIdentity, identify
+from .snapshot import HardwareSnapshot, capture, detect_and_capture
 
 __all__ = [
     "UNKNOWN",
+    "STATUS_DETECTED",
+    "STATUS_INFERRED",
+    "STATUS_DATABASE_MATCH",
+    "STATUS_NOT_DETECTED",
+    "STATUS_UNKNOWN",
+    "STATUS_NOT_AVAILABLE",
     "DetectedValue",
     "HardwareInfo",
     "HardwareIdentity",
     "detect_all",
     "detect_limited",
     "identify",
+    "HardwareSnapshot",
+    "capture",
+    "detect_and_capture",
     "unknown",
     "detected",
     "deduced",
+    "database_match",
+    "not_available",
 ]

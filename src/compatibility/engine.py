@@ -34,6 +34,11 @@ class CompatibilityEngine:
             raise ValueError("identity o info richiesto")
 
         match = self.match(identity)
+        return self.evaluate_match(identity, match)
+
+    def evaluate_match(self, identity: HardwareIdentity, match: MatchResult) -> CompatibilityResult:
+        """Valuta usando un match già eseguito (utile per Snapshots che non vogliono
+        ri-eseguire il matching)."""
         return evaluate(identity, match.profile, match)
 
     def analyze_hardware(self, info: HardwareInfo) -> CompatibilityResult:

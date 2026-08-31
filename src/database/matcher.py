@@ -8,12 +8,18 @@ inferenze da testo libero per affermare una compatibilita'.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import re
 from hardware.detection import UNKNOWN
 from hardware.identification import HardwareIdentity
 from database.loader import HardwareProfile
+
+
+MATCH_EXACT = "EXACT_MATCH"
+MATCH_CLOSE = "CLOSE_MATCH"
+MATCH_PARTIAL = "PARTIAL_MATCH"
+MATCH_NONE = "NO_MATCH"
 
 
 @dataclass
@@ -34,6 +40,39 @@ class MatchResult:
     @property
     def matched(self) -> bool:
         return self.profile is not None and self.score >= MIN_SCORE
+
+    @property
+    def match_type(self) -> str:
+        """Classificazione del match: EXACT/CLOSE/PARTIAL/NO_MATCH.
+
+        Non e' inventata: deriva da campi realmente matchati e score.
+        PARTIAL = evidenza debole (vendor/cpu/famiglia) ma non abbastanza per
+        selezionare il profilo. NO_MATCH = nessuna evidenza.
+        """
+        if not self.profile:
+            return MATCH_PARTIAL if self.score > 0 else MATCH_NONE
+        fields = set(self.matched_fields)
+        # Corrispondenza esatta su modello/board della macchina rilevata.
+        if "model" in fields or "board" in fields:
+            if self.score >= 3 or ("model" in fields and "board" in fields):
+                return MATCH_EXACT
+            if "board" in fields or "model" in fields:
+                return MATCH_CLOSE
+        if self.score >= MIN_SCORE:
+            return MATCH_CLOSE
+        if self.score > 0:
+            return MATCH_PARTIAL
+        return MATCH_NONE
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "matched": self.matched,
+            "match_type": self.match_type,
+            "score": self.score,
+            "matched_fields": self.matched_fields,
+            "reasons": self.reasons,
+            "profile_id": self.profile.id if self.profile else None,
+        }
 
 
 MIN_SCORE = 2

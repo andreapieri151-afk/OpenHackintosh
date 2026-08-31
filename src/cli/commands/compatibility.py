@@ -2,24 +2,21 @@
 
 from __future__ import annotations
 
-from hardware import detect_all, identify
-from database import load_all_profiles
-from compatibility import CompatibilityEngine, OverallStatus
+from hardware import detect_and_capture
 from ai import Assistant
 from ..output import Out, status_icon
 
 
 def run_compatibility(args, out: Out) -> dict:
-    info = detect_all()
-    identity = identify(info)
-    profiles = load_all_profiles()
-    engine = CompatibilityEngine(profiles)
-    result = engine.analyze(identity=identity, info=info)
+    snapshot = detect_and_capture()
+    identity = snapshot.identity
+    result = snapshot.result
 
     if out.json_output:
         payload = {
             "mode": "compatibility",
             "identity": identity.to_dict(),
+            "match": snapshot.match.to_dict() if snapshot.match else {"match_type": "NO_MATCH"},
             "result": result.to_dict(),
         }
         out.data(payload)

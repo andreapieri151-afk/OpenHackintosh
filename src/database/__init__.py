@@ -7,11 +7,22 @@ from .loader import (
     load_all_profiles,
     load_profile,
 )
-from .matcher import MatchResult, match_profile
+from .matcher import (
+    MATCH_EXACT,
+    MATCH_CLOSE,
+    MATCH_PARTIAL,
+    MATCH_NONE,
+    MatchResult,
+    match_profile,
+)
 
 __all__ = [
     "DB_DIR",
     "VALID_STATES",
+    "MATCH_EXACT",
+    "MATCH_CLOSE",
+    "MATCH_PARTIAL",
+    "MATCH_NONE",
     "HardwareProfile",
     "ProfileLoadError",
     "MatchResult",
