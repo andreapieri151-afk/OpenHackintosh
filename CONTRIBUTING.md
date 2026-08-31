@@ -59,7 +59,7 @@ Il downloader lo scaricherà da GitHub release.
 
 ### 3. Migliorare la CLI
 
-La CLI è in `src/cli/` (package). Se hai idee per renderla più chiara, con più opzioni o con output migliore, fai pure. La release 2.0.2 è solo terminale, quindi la CLI è la faccia principale del tool.
+La CLI è in `src/cli/` (package). Se hai idee per renderla più chiara, con più opzioni o con output migliore, fai pure. La release 2.0.1 Beta 1 è solo terminale, quindi la CLI è la faccia principale del tool.
 
 ### 4. Fixare bug
 

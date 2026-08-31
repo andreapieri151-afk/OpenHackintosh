@@ -37,7 +37,7 @@ from .commands import (
     run_bios,
 )
 
-VERSION = "2.0.2"
+VERSION = "2.0.1 Beta 1"
 
 
 def build_parser() -> argparse.ArgumentParser:

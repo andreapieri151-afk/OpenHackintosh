@@ -14,6 +14,8 @@ Così l'ho riscritto da zero, ma **per bene**. Con file veri scaricati da GitHub
 
 **Ora supporta Q556/2 e Q957, e nei prossimi giorni aggiungerò altri dispositivi** - mini PC, laptop, desktop Skylake/Kaby Lake/Coffee Lake. Se hai un PC e vuoi che lo supporti, apri una issue con il modello e lo aggiungo.
 
+> ⚠️ **Questa è una BETA.** La versione distribuita è **OpenHackintosh 2.0.1 Beta 1**: è un checkpoint stabile usato per iniziare a distribuire il progetto, ma il supporto hardware è ancora **sperimentale**. Non aspettarti che ogni PC booti al primo colpo; testa su hardware reale e apri issue con i log.
+
 ---
 
 ## Cosa fa, in pratica?
@@ -84,47 +86,68 @@ Un po' come OpCore-Simplify ma più semplice, più umano, con CLI chiara e con f
 
 ## Come si usa? (da terminale)
 
-La 2.0.2 è **solo terminale**: ho tolto GUI e Web Dashboard per mantenere il tool semplice, testabile e senza dipendenze inutili.
+OpenHackintosh **2.0.1 Beta 1** è **solo terminale**: ho tolto GUI e Web Dashboard per mantenere il tool semplice, testabile e senza dipendenze inutili.
 
-### 1. Doppio click su macOS (il più facile)
+### 1. macOS — doppio click (il più facile)
 
-Scarica release, scompatta, doppio click su `FujitsuEFI.command` (lo rinominerò in OpenHackintosh.command presto). Apre il terminale, installa le dipendenze se servono, elenca i profili disponibili.
+1. **Download** dello ZIP della release (v2.0.1-beta.1)
+2. **Extract**
+3. **Doppio click su `OpenHackintosh.command`**
+4. Si apre il Terminale e parte automaticamente OpenHackintosh
 
-### 2. Terminale (interfaccia principale)
+Se macOS non lo esegue (o il file `.command` ha perso il bit eseguibile), apri Terminale nella cartella e lancia:
 
 ```bash
-git clone https://github.com/andreapieri151-afk/OpenHackintosh.git
-cd OpenHackintosh
-pip install -r requirements.txt
-
-# Menu interattivo
-python3 main.py
-
-# Rileva hardware reale
-python3 main.py detect
-
-# Diagnosi completa (hardware + compatibilità + spiegazione)
-python3 main.py diagnose
-
-# Controlla compatibilità con il database
-python3 main.py compatibility
-
-# Genera EFI hardware-aware
-python3 main.py generate
-
-# Valida una EFI già generata
-python3 main.py validate output/EFI
-
-# Profili database
-python3 main.py database list
-python3 main.py database show fujitsu_q556_2
-
-# Output JSON (per script/CI/AI)
-python3 main.py diagnose --json
-python3 main.py detect --json
+chmod +x OpenHackintosh.command
+./OpenHackintosh.command
 ```
 
-Tutte le opzioni sono visibili con `python3 main.py --help`.
+oppure, senza necessità di eseguibilità:
+
+```bash
+bash OpenHackintosh.command
+```
+
+### 2. Linux / macOS — terminale
+
+```bash
+cd cartella_estratta
+
+# Avvio automatico (menu interattivo o con argomenti)
+./openhackintosh.sh                 # Linux
+./OpenHackintosh.command            # macOS
+./openhackintosh
+
+# Menu interattivo
+./openhackintosh
+
+# Rileva hardware reale
+./openhackintosh detect
+
+# Diagnosi completa (hardware + matching + compatibilità)
+./openhackintosh diagnose
+
+# Output JSON (per script/CI/AI)
+./openhackintosh diagnose --json
+
+# Controlla compatibilità con il database
+./openhackintosh compatibility
+
+# Genera EFI hardware-aware
+./openhackintosh generate
+
+# Valida una EFI già generata
+./openhackintosh validate output/EFI
+
+# Guida BIOS per profilo
+./openhackintosh bios --profile fujitsu_q556_2
+
+# Profili database
+./openhackintosh database list
+./openhackintosh database show fujitsu_q556_2
+```
+
+Tutte le opzioni sono visibili con `./openhackintosh --help`.
 
 ---
 
@@ -152,14 +175,17 @@ Se incasini tutto: togli batteria CMOS 10 minuti o sposta jumper BIOS.
 
 ```
 EFI/
-├── BOOT/BOOTx64.efi (vero, 50KB+)
+├── BOOT/BOOTx64.efi (vero, PE/COFF)
 └── OC/
-    ├── ACPI/ -> SSDT-PLUG, EC-USBX, AWAC, PMC (veri da Dortania)
-    ├── Drivers/ -> HfsPlus, OpenRuntime, OpenCanopy (veri)
+    ├── ACPI/ -> SSDT-PLUG-DRTNIA, SSDT-EC-USBX-DESKTOP (veri, dal profilo)
+    ├── Drivers/ -> HfsPlus, OpenRuntime (padrone; driver opzionali solo se richiesti)
     ├── Kexts/ -> Lilu, VirtualSMC, WhateverGreen, AppleALC, RealtekRTL8111 (veri con binari)
-    ├── OpenCore.efi (vero, 1MB+)
+    ├── OpenCore.efi (vero, PE/COFF)
     └── config.plist (fatto bene per il tuo hardware, non a caso)
 ```
+
+I componenti opzionali vengono inclusi **solo se richiesti** (`--include-nvme`,
+`--include-restrict-events`, `--include-optional-drivers`, `--wifi`, `--bluetooth`).
 
 ---
 
@@ -181,12 +207,11 @@ Guida completa in docs/.
 
 ## Kext inclusi
 
-- **Lilu, VirtualSMC, WhateverGreen, AppleALC** - base, obbligatori
-- **RealtekRTL8111 / IntelMausi** - LAN (auto in base a PC)
-- **NVMeFix, RestrictEvents** - utili
-- **Intel WiFi/BT** - opzionali
+- **Lilu, VirtualSMC, WhateverGreen, AppleALC** — base, obbligatori
+- **RealtekRTL8111 / IntelMausi** — LAN (auto in base al profilo)
+- **NVMeFix, RestrictEvents, AirportItlwm, IntelBluetoothFirmware** — **opzionali**, inclusi solo su richiesta esplicita
 
-Tutti da GitHub ufficiale.
+Tutti da GitHub ufficiale, validati (Mach-O) prima di entrare nell'EFI.
 
 ---
 
@@ -197,7 +222,7 @@ Tutti da GitHub ufficiale.
 - [x] Supporto Q556/2 e Q957
 - [x] Rinominato OpenHackintosh (da tool singolo a universale)
 - [x] README più umano
-- [x] Rimossa GUI e Web Dashboard (v2.0.2: solo terminale)
+- [x] Rimossa GUI e Web Dashboard (v2.0.1 Beta 1: solo terminale)
 - [x] Hardware Detection (`hardware/detection.py`)
 - [x] Hardware Database JSON (`database/profiles/`)
 - [x] Compatibility Engine deterministico (`compatibility/`)
@@ -215,7 +240,7 @@ Tutti da GitHub ufficiale.
 
 ## Come contribuire
 
-Se vuoi aggiungere il tuo PC, è facile (2.0.2 usa un database JSON):
+Se vuoi aggiungere il tuo PC, è facile (questa versione usa un database JSON):
 
 1. Crea una cartella in `src/database/profiles/` (es. `lenovo_m720q/`)
 2. Aggiungi `profile.json` con: manufacturer, model, board, CPU, GPU, audio, LAN, kext/driver/SSDT, SMBIOS, config e stato:

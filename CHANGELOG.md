@@ -1,5 +1,22 @@
 # Changelog - Tutte le bestemmie in ordine cronologico
 
+## 2.0.1 Beta 1 - 2026-08-31 - CHECKPOINT DI DISTRIBUZIONE (PRERELEASE)
+
+Questa è una **build di distribuzione/checkpoint** dello stato attuale, non una
+nuova fase architetturale. Include:
+
+- **CLI-first workflow**: il tool si usa da terminale, niente GUI/web.
+- **Hardware detection/diagnosis**: detection DMI, CPU, GPU, audio, Ethernet, Wi-Fi, USB, storage, ACPI + report `diagnose`.
+- **Hardware identification + database matching**: `EXACT_MATCH` / `CLOSE_MATCH` / `PARTIAL_MATCH` / `NO_MATCH`, basato su `src/database/`.
+- **Compatibility analysis**: motore deterministico basato su DB/regole/HW-ID, mai su invenzioni AI.
+- **EFI generator hardening**: binari reali, validazione Mach-O/PE/COFF/AML, config↔file consistency, zero-byte/placeholder detection, SHA-256, cache, final EFI audit, clean failure.
+- **No fake binaries**: se un componente obbligatorio non è ottenibile/verificato, la generazione **fallisce**.
+- **Migliorata gestione errori** e output JSON strutturato.
+
+> ⚠️ BETA: il supporto è sperimentale. Nessun profilo viene dichiarato VERIFIED
+> senza test fisico sul hardware. Il profilo Q556/2 è marcato VERIFIED dal
+> creatore del progetto; Q957 è DOCUMENTED.
+
 ## [Unreleased] - 2026-08-30 - v2.0.2 in preparazione (NON PUBBLICATA)
 
 ### Rimosso GUI e Web Dashboard: solo terminale

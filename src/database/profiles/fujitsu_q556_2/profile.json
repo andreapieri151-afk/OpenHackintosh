@@ -264,7 +264,7 @@
   "compatibility": {
     "state": "VERIFIED",
     "verified_by": "project author (Q556/2 hardware)",
-    "notes": "Profili di riferimento per OpenHackintosh 2.0.2.",
+    "notes": "Profili di riferimento per OpenHackintosh 2.0.1 Beta 1.",
     "requires_hardware_testing": false
   },
   "limitations": [

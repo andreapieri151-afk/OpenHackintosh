@@ -25,6 +25,10 @@ class Out:
         self.json_output = json_output
         self.dev = dev
 
+    def title(self, text: str) -> None:
+        """Stampa un titolo di sezione (delega alla funzione modulo omonima)."""
+        print(title(text))
+
     def data(self, data: Any, label: Optional[str] = None) -> None:
         if self.json_output:
             print(json.dumps(data, indent=2, ensure_ascii=False))
