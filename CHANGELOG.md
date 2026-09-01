@@ -1,5 +1,68 @@
 # Changelog - Tutte le bestemmie in ordine cronologico
 
+## 2.0.1 Beta 1 — HOTFIX SELETTORE CLI - 2026-09-01
+
+> Stessa versione **2.0.1 Beta 1**, ricostruita con il selettore corretto.
+> Non è una 2.0.2. Build: `releases/OpenHackintosh-2.0.1-Beta-1-fixed.zip`
+> (la build originale resta `releases/OpenHackintosh-2.0.1-Beta-1.zip`).
+
+### Corretto — componente di selezione/input del menu (root cause)
+
+Il menu principale leggeva **un solo carattere** e lo convertiva subito in una
+scelta (`int(char) - 1`). Un modello a cifra singola, quindi:
+
+- **numeri multi-cifra impossibili**: digitando `1` poi `0` veniva selezionata
+  l'opzione `1`, e la voce `[10] Exit` era irraggiungibile da tastiera;
+- **frecce non riconosciute in application cursor mode**: erano gestite solo le
+  sequenze `ESC [ A` / `ESC [ B`, non `ESC O A` / `ESC O B` — quelle inviate dal
+  Terminale di macOS, da `tmux` e da `screen`;
+- **ESC bloccava il programma**: dopo `\x1b` veniva eseguita una
+  `sys.stdin.read(2)` bloccante, senza timeout;
+- **Ctrl+C non funzionava**: `tty.setraw` disabilita ISIG (e OPOST);
+- **menu ristampato a ogni tasto** invece di essere aggiornato in place;
+- **input non valido ignorato in silenzio**, senza messaggio di errore;
+- fallback non-TTY che accettava solo cifre singole e poteva lasciare l'indice
+  evidenziato fuori range.
+
+### Aggiunto
+
+- `src/cli/selector.py`: componente di selezione **generico e riusabile**
+  - buffer numerico multi-cifra con disambiguazione (cifra successiva, Enter o
+    timeout): valido per 10, 12, 100+ opzioni senza modifiche;
+  - decoder tastiera completo: `ESC [` (CSI) e `ESC O` (SS3), frecce,
+    Home/End/PageUp/PageDown, Tab/Shift+Tab, Backspace/Canc, Enter del
+    tastierino, Ctrl+C, Ctrl+D;
+  - ESC isolato riconosciuto tramite timeout sulla sequenza;
+  - modalità **cbreak** al posto di *raw*: Ctrl+C e l'output restano corretti;
+  - lettura via `os.read()` su file descriptor con decoder UTF-8 incrementale
+    (niente buffering di `sys.stdin`);
+  - ridisegno **in place** del menu con sequenze ANSI, evidenziazione della voce
+    attiva e anteprima del numero digitato;
+  - messaggi espliciti per l'input non valido, con lo stato del menu preservato;
+  - fallback line-based per stdin non interattivo (pipe/CI) con supporto
+    multi-cifra, match per etichetta, `q`/`quit`/`exit` e protezione contro i
+    loop infiniti.
+- `tests/test_selector.py`: 129 test — decodifica tasti, macchina a stati,
+  numeri multi-cifra (fino a 123 opzioni), frecce, Enter, ESC, Ctrl+C, input non
+  valido, fallback non-TTY, rendering ed **end-to-end su pseudo-terminale reale**.
+- `tools/build_release.py`: build riproducibile dello ZIP di distribuzione.
+- `docs/HOTFIX-2.0.1-Beta-1-SELECTOR.md`: nota tecnica dell'hotfix.
+
+### Modificato
+
+- `src/cli/interactive.py`: ora è un adattatore sottile sopra `cli.selector`.
+  `run_menu()` mantiene la stessa firma e restituisce la voce di uscita quando
+  la selezione viene annullata.
+- `src/cli/main.py`: voci di menu e mappatura azione→comando estratte in
+  `MENU_ITEMS` / `MENU_COMMANDS` (testabili). **La logica delle singole azioni
+  non è stata toccata.**
+
+### Invariato
+
+- Versione (`2.0.1 Beta 1`), launcher (`OpenHackintosh.command`,
+  `FujitsuEFI.command`, `openhackintosh`, `openhackintosh.sh`), `src/efi/`,
+  `src/efi_builder/`, database, detection e compatibilità.
+
 ## 2.0.1 Beta 1 - 2026-08-31 - CHECKPOINT DI DISTRIBUZIONE (PRERELEASE)
 
 Questa è una **build di distribuzione/checkpoint** dello stato attuale, non una

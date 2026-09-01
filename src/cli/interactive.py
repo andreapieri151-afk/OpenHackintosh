@@ -1,41 +1,34 @@
 """
-Interfaccia interattiva da terminale (menù con frecce/invio).
+Interfaccia interattiva da terminale (menu con frecce/numeri/Enter).
 
-Se il terminale non supporta i colori/unicode o non e' un TTY, si degrada
-a un menu numerato semplice. Nessuna GUI.
+La logica del selettore vive in :mod:`cli.selector`: qui restano solo il
+banner e l'adattatore ``run_menu`` usato dalla CLI.
+
+Se il terminale non e' un TTY (pipe, CI, script) il menu degrada
+automaticamente a un elenco numerato letto riga per riga. Nessuna GUI.
 """
 
 from __future__ import annotations
 
 import os
 import sys
-from typing import Callable, List, Optional
+from typing import List, Optional, Sequence
 
+from .selector import (  # noqa: F401  (riesportati per compatibilita')
+    KeyReader,
+    SelectorState,
+    decode_key,
+    is_interactive,
+    parse_line_selection,
+    render_menu,
+    select,
+)
 
-def _getch() -> Optional[str]:
-    try:
-        import termios
-        import tty
-        fd = sys.stdin.fileno()
-        old = termios.tcgetattr(fd)
-        try:
-            tty.setraw(fd)
-            ch = sys.stdin.read(1)
-            if ch == "\x1b":
-                seq = sys.stdin.read(2)
-                return ch + seq
-            return ch
-        finally:
-            termios.tcsetattr(fd, termios.TCSADRAIN, old)
-    except Exception:
-        return None
+DEFAULT_PROMPT = "Use arrows or numbers (1-N), Enter to confirm, ESC/q to cancel."
 
 
 def is_tty() -> bool:
-    try:
-        return sys.stdin.isatty() and sys.stdout.isatty()
-    except Exception:
-        return False
+    return is_interactive()
 
 
 def supports_color() -> bool:
@@ -56,45 +49,46 @@ def banner() -> str:
     ])
 
 
+def _cancel_item(items: Sequence[dict]) -> dict:
+    """Voce da restituire quando l'utente annulla (ESC/q/EOF/Ctrl+C).
+
+    Preferisce la voce con ``action == "exit"``; altrimenti l'ultima.
+    """
+    for item in items:
+        if str(item.get("action", "")).lower() in ("exit", "quit"):
+            return item
+    return items[-1]
+
+
 def run_menu(items: List[dict], title: str = "What would you like to do?",
-             prompt: str = "Use arrows / numbers, Enter to select.") -> dict:
-    print(banner())
-    print(title)
-    idx = 0
-    while True:
-        print("\r" + " " * 60 + "\r", end="")
-        for i, item in enumerate(items):
-            cursor = ">" if i == idx else " "
-            label = item["label"]
-            marker = "❯" if i == idx else " "
-            print(f"  {marker} {label}{(30 - len(label)) * ' '}   [{i + 1}]")
+             prompt: str = DEFAULT_PROMPT,
+             index: int = 0) -> dict:
+    """Mostra il menu e restituisce la voce scelta.
 
-        print(prompt)
+    Funziona con un numero qualsiasi di opzioni, comprese quelle multi-cifra
+    ([10], [11], ...). In caso di annullamento restituisce la voce di uscita.
+    """
+    if not items:
+        raise ValueError("run_menu richiede almeno una voce di menu")
 
-        char = _getch()
-        if char is None:
-            # fallback input numerico
-            try:
-                sel = input("> ")
-                if sel.strip().isdigit():
-                    idx = int(sel.strip()) - 1
-                    if 0 <= idx < len(items):
-                        return items[idx]
-                elif sel.strip().lower() in ("q", "exit"):
-                    return items[-1]
-            except EOFError:
-                return items[-1]
-            continue
+    print(banner(), end="")
+    chosen = select(items, title=title, prompt=prompt, index=index)
+    if chosen is None:
+        return _cancel_item(items)
+    return items[chosen]
 
-        if char == "\r" or char == "\n":
-            return items[idx]
-        if char == "\x1b[A":
-            idx = (idx - 1) % len(items)
-        elif char == "\x1b[B":
-            idx = (idx + 1) % len(items)
-        elif char and char.isdigit():
-            n = int(char) - 1
-            if 0 <= n < len(items):
-                return items[n]
-        elif char and char.lower() == "q":
-            return items[-1]
+
+def _getch() -> Optional[str]:
+    """Compatibilita' con la 2.0.1 Beta 1: legge un singolo tasto.
+
+    Ora usa :class:`cli.selector.KeyReader`, quindi gestisce correttamente
+    ESC isolato e le frecce in application mode.
+    """
+    if not is_interactive():
+        return None
+    reader = KeyReader()
+    try:
+        with reader:
+            return reader.read_key()
+    except Exception:
+        return None

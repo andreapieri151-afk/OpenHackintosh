@@ -125,38 +125,45 @@ def run_ask(args, out: Out) -> dict:
     return payload
 
 
+#: Voci del menu interattivo. Definite a livello di modulo cosi' il selettore
+#: e i test possono verificare che OGNI opzione (comprese le multi-cifra) sia
+#: raggiungibile e mappata sull'azione corretta.
+MENU_ITEMS: List[dict] = [
+    {"label": "Analyze this computer", "action": "diagnose"},
+    {"label": "Generate EFI", "action": "generate"},
+    {"label": "Validate EFI", "action": "validate"},
+    {"label": "Check compatibility", "action": "compatibility"},
+    {"label": "View hardware", "action": "detect"},
+    {"label": "View database", "action": "database"},
+    {"label": "BIOS guide", "action": "bios"},
+    {"label": "Doctor", "action": "doctor"},
+    {"label": "Ask the assistant", "action": "ask"},
+    {"label": "Exit", "action": "exit"},
+]
+
+#: Mappatura azione del menu -> argomenti del sottocomando CLI corrispondente.
+MENU_COMMANDS = {
+    "diagnose": ["diagnose"],
+    "generate": ["generate", "--output", "output/EFI"],
+    "validate": ["validate", "output/EFI"],
+    "compatibility": ["compatibility"],
+    "detect": ["detect"],
+    "database": ["database", "list"],
+    "bios": ["bios", "--profile", "fujitsu_q556_2"],
+    "doctor": ["doctor"],
+    "ask": ["ask"],
+}
+
+
 def interactive_main(out: Out) -> None:
-    items: List[dict] = [
-        {"label": "Analyze this computer", "action": "diagnose"},
-        {"label": "Generate EFI", "action": "generate"},
-        {"label": "Validate EFI", "action": "validate"},
-        {"label": "Check compatibility", "action": "compatibility"},
-        {"label": "View hardware", "action": "detect"},
-        {"label": "View database", "action": "database"},
-        {"label": "BIOS guide", "action": "bios"},
-        {"label": "Doctor", "action": "doctor"},
-        {"label": "Ask the assistant", "action": "ask"},
-        {"label": "Exit", "action": "exit"},
-    ]
+    items: List[dict] = [dict(item) for item in MENU_ITEMS]
     choice = run_menu(items)
-    if choice["action"] == "exit":
+    if choice is None or choice.get("action") == "exit":
         return
 
     # Esegue la stessa logica dei sottocomandi
-    import argparse
     parser = build_parser()
-    mappings = {
-        "diagnose": ["diagnose"],
-        "generate": ["generate", "--output", "output/EFI"],
-        "validate": ["validate", "output/EFI"],
-        "compatibility": ["compatibility"],
-        "detect": ["detect"],
-        "database": ["database", "list"],
-        "bios": ["bios", "--profile", "fujitsu_q556_2"],
-        "doctor": ["doctor"],
-        "ask": ["ask"],
-    }
-    argv = mappings.get(choice["action"], ["doctor"])
+    argv = list(MENU_COMMANDS.get(choice["action"], ["doctor"]))
     if out.json_output:
         argv.append("--json")
     if out.dev:

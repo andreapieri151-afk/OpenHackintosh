@@ -27,6 +27,7 @@ ENV/
 # EFI builds
 EFI/
 *.zip
+!releases/*.zip
 /tmp/
 output/
 builds/
