@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenHackintosh - EFI vere, non finte</title>
+<style>
+:root {
+  --bg: #0a0a0a;
+  --card: #1a1a1a;
+  --border: #2a2a2a;
+  --text: #e5e5e5;
+  --text-dim: #888;
+  --accent: #007AFF;
+  --accent-hover: #0056b3;
+  --success: #30d158;
+  --warning: #ffd60a;
+  --error: #ff453a;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+.header { padding: 40px; border-bottom: 1px solid var(--border); background: linear-gradient(180deg, #1a1a1a 0%, #0a0a0a 100%); }
+.header h1 { font-size: 32px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 8px; }
+.header p { color: var(--text-dim); font-size: 16px; }
+.header .badge { display: inline-block; background: var(--success); color: black; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; margin-top: 12px; }
+.container { max-width: 1200px; margin: 0 auto; padding: 30px; display: grid; grid-template-columns: 380px 1fr; gap: 30px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 24px; }
+.card h2 { font-size: 18px; font-weight: 600; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+.form-group { margin-bottom: 20px; }
+.form-group label { display: block; font-size: 13px; font-weight: 500; color: var(--text-dim); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+.form-group select, .form-group input { width: 100%; background: #2a2a2a; border: 1px solid #3a3a3a; color: var(--text); padding: 12px 16px; border-radius: 10px; font-size: 14px; outline: none; transition: all 0.2s; }
+.form-group select:focus, .form-group input:focus { border-color: var(--accent); background: #333; }
+.checkbox { display: flex; align-items: center; gap: 12px; padding: 12px; background: #222; border-radius: 10px; margin-bottom: 10px; cursor: pointer; transition: all 0.2s; }
+.checkbox:hover { background: #2a2a2a; }
+.checkbox input { width: 18px; height: 18px; }
+.checkbox label { margin:0; text-transform:none; font-size:14px; color: var(--text); cursor:pointer; }
+.btn { width: 100%; padding: 16px; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.btn-primary { background: var(--accent); color: white; }
+.btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); }
+.btn-primary:disabled { opacity:0.5; cursor:not-allowed; transform:none; }
+.btn-secondary { background: #2a2a2a; color: var(--text); margin-top: 10px; }
+.progress { width: 100%; height: 6px; background: #2a2a2a; border-radius: 3px; overflow: hidden; margin: 20px 0; }
+.progress-bar { height: 100%; background: linear-gradient(90deg, var(--accent), var(--success)); width: 0%; transition: width 0.3s; }
+.log { background: #0a0a0a; border: 1px solid var(--border); border-radius: 10px; padding: 16px; font-family: 'SF Mono', Monaco, monospace; font-size: 12px; height: 400px; overflow-y: auto; white-space: pre-wrap; line-height: 1.5; }
+.hardware-info { background: #222; border-radius: 10px; padding: 16px; margin-top: 16px; font-size: 12px; line-height: 1.6; }
+.smbios-preview { background: linear-gradient(135deg, #1a1a1a, #2a2a2a); border: 1px solid #333; border-radius: 12px; padding: 16px; margin-top: 20px; font-family: monospace; font-size: 11px; }
+.status-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+.status-ready { background: #2a2a2a; color: var(--text-dim); }
+.status-running { background: #003366; color: #66b3ff; }
+.status-success { background: #003300; color: var(--success); }
+.status-error { background: #330000; color: var(--error); }
+@media (max-width: 900px) { .container { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>OpenHackintosh 🍎</h1>
+  <p>Nato perché mi ero rotto di EFI finte che non bootano. Ora scarica file veri, non fuffa.</p>
+  <div class="badge">✓ File veri da GitHub ufficiale • 0 byte? Mai più • Testato sul mio Q556/2</div>
+</div>
+
+<div class="container">
+  <div>
+    <div class="card">
+      <h2>⚙️ Il tuo PC</h2>
+      
+      <div class="form-group">
+        <label>Che PC hai?</label>
+        <select id="profile">
+          <option value="Q556/2" selected>Q556/2 (Realtek LAN) - quello mio</option>
+          <option value="Q957">Q957 (Intel LAN)</option>
+        </select>
+        <div id="profile-info" class="hardware-info"></div>
+      </div>
+
+      <div class="form-group">
+        <label>Che macOS vuoi?</label>
+        <select id="macos">
+          <option value="Ventura 13.x" selected>Ventura 13.x - quello più stabile per Q556/2</option>
+          <option value="Monterey 12.x">Monterey 12.x - vecchio ma stabile</option>
+          <option value="Sonoma 14.x">Sonoma 14.x - serve iMacPro1,1</option>
+          <option value="Sequoia 15.x">Sequoia 15.x - sperimentale, auguri</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Che Mac fingiamo di essere?</label>
+        <select id="smbios">
+          <option value="iMac18,1" selected>iMac18,1 - per Skylake, va sempre</option>
+          <option value="iMac17,1">iMac17,1 - vecchio Skylake</option>
+          <option value="iMac19,1">iMac19,1 - Coffee Lake</option>
+          <option value="Macmini8,1">Macmini8,1 - compatto, carino</option>
+          <option value="iMacPro1,1">iMacPro1,1 - per Sonoma/Sequoia</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Audio - se non va prova altri</label>
+        <select id="audio">
+          <option value="11" selected>11 - quello che funziona a me</option>
+          <option value="13">13</option>
+          <option value="15">15</option>
+          <option value="21">21</option>
+          <option value="27">27</option>
+          <option value="28">28</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Extra (se hai WiFi Intel)</label>
+        <div class="checkbox">
+          <input type="checkbox" id="wifi">
+          <label for="wifi">Ho WiFi Intel (AirportItlwm)</label>
+        </div>
+        <div class="checkbox">
+          <input type="checkbox" id="bt">
+          <label for="bt">Ho Bluetooth Intel</label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Come lo chiamo?</label>
+        <input type="text" id="output" value="EFI_Q5562" placeholder="EFI_Q5562">
+      </div>
+
+      <button class="btn btn-primary" id="build-btn" onclick="startBuild()">
+        <span>🚀</span> Crea EFI vera, non finta
+      </button>
+      <button class="btn btn-secondary" onclick="generateSMBIOS()">🎲 Genera SMBIOS a caso</button>
+    </div>
+
+    <div class="card" style="margin-top:20px;">
+      <h2>📋 BIOS - Se sbagli qui non boota</h2>
+      <div style="font-size:13px; line-height:1.6; color:var(--text-dim);">
+        <strong style="color:var(--error);">Disabilita (altrimenti rompono):</strong><br>
+        Fast Boot, Secure Boot, Serial Port, VT-d, CSM, SGX<br><br>
+        <strong style="color:var(--success);">Abilita:</strong><br>
+        VT-x, Above 4G, EHCI/XHCI Hand-off, OS UEFI, <strong style="color:white;">DVMT 64MB (FONDAMENTALE!)</strong><br><br>
+        Se non trovi DVMT 64MB, leggi docs/BIOS_GUIDE.md - l'ho scritta col sangue.
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="card">
+      <h2>📊 Cosa sta facendo <span id="status-badge" class="status-badge status-ready">● Pronto a creare EFI vera</span></h2>
+      
+      <div class="progress"><div class="progress-bar" id="progress"></div></div>
+      
+      <div class="log" id="log">Ciao! Sono Andrea 👋
+
+Questo è OpenHackintosh, nato perché mi ero rotto di tool che creano EFI finte.
+
+Storia veloce:
+- Avevo Q556/2, volevo Hackintosh
+- Provo un tool vecchio, fa EFI bellissima ma file vuoti (0 byte)
+- 3 giorni a bestemmiare davanti a logo Fujitsu che si riavvia all'infinito
+- Decido di riscriverlo da zero, con file veri, scaricati da GitHub ufficiale
+
+Ora fa così:
+✓ Scarica OpenCore vero da Acidanthera (10MB, non 0 byte)
+✓ Scarica kext veri con binari dentro (Lilu 245KB, non vuoto)
+✓ Scarica SSDT veri da Dortania
+✓ Genera config.plist giusto per Skylake (non a caso)
+✓ Crea SMBIOS credibile
+✓ Fa ZIP pronto per USB
+
+Scegli il tuo PC a sinistra e clicca il bottone grosso.
+Se non boota, 99% è BIOS - leggi docs/BIOS_GUIDE.md, c'è scritto DVMT 64MB ovunque perché è fondamentale.
+
+Buon Hackintosh! 🍎
+</div>
+
+      <div id="smbios-preview" class="smbios-preview" style="display:none;"></div>
+      
+      <div id="result" style="margin-top:20px; display:none;"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+let profiles = {};
+fetch('/api/profiles').then(r=>r.json()).then(data=>{
+  profiles = data;
+  updateProfileInfo();
+});
+
+function updateProfileInfo(){
+  const p = document.getElementById('profile').value;
+  const info = profiles[p];
+  if(!info) return;
+  document.getElementById('profile-info').innerHTML = `
+    <strong>Board:</strong> ${info.board}<br>
+    <strong>Chipset:</strong> ${info.chipset}<br>
+    <strong>LAN:</strong> ${info.lan} (${info.lan_kext})<br>
+    <strong>Audio:</strong> ${info.audio}<br>
+    <strong>iGPU:</strong> ${info.igpu}<br><br>
+    <em style="color:#888;">${p==='Q556/2' ? 'Questo è il mio, testato con i3-6100T e Ventura' : 'Simile al Q556/2 ma con Intel LAN'}</em>
+  `;
+}
+document.getElementById('profile').addEventListener('change', updateProfileInfo);
+
+function generateSMBIOS(){
+  const model = document.getElementById('smbios').value;
+  fetch(`/api/generate_smbios?model=${model}`).then(r=>r.json()).then(data=>{
+    const preview = document.getElementById('smbios-preview');
+    preview.style.display = 'block';
+    preview.innerHTML = `<strong>SMBIOS a caso per ${data.ProductName} (poi rigenera con GenSMBIOS per uso tuo):</strong><br>
+    Serial: ${data.SerialNumber}<br>
+    MLB: ${data.MLB}<br>
+    UUID: ${data.SystemUUID}<br>
+    ROM: ${data.ROM}<br><br>
+    <em style="color:#888;">Questo è generato a caso, per installazione vera usa GenSMBIOS</em>`;
+  });
+}
+
+let pollInterval = null;
+function startBuild(){
+  const btn = document.getElementById('build-btn');
+  btn.disabled = true;
+  btn.innerHTML = '⏳ Sto scaricando file veri da GitHub...';
+  document.getElementById('status-badge').className = 'status-badge status-running';
+  document.getElementById('status-badge').innerHTML = '● Sto scaricando roba vera...';
+  document.getElementById('log').textContent = '';
+  document.getElementById('progress').style.width = '10%';
+  
+  const payload = {
+    profile: document.getElementById('profile').value,
+    macos: document.getElementById('macos').value,
+    smbios: document.getElementById('smbios').value,
+    audio_layout: document.getElementById('audio').value,
+    wifi: document.getElementById('wifi').checked,
+    bluetooth: document.getElementById('bt').checked,
+    output: document.getElementById('output').value
+  };
+  
+  fetch('/api/build', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)})
+  .then(r=>r.json())
+  .then(data=>{
+    if(data.error){
+      alert(data.error);
+      btn.disabled = false;
+      return;
+    }
+    pollInterval = setInterval(pollLogs, 1000);
+  });
+}
+
+function pollLogs(){
+  fetch('/api/status').then(r=>r.json()).then(data=>{
+    document.getElementById('log').textContent = data.logs.join('\n');
+    document.getElementById('log').scrollTop = document.getElementById('log').scrollHeight;
+    document.getElementById('progress').style.width = (data.progress*100)+'%';
+    
+    if(!data.running){
+      clearInterval(pollInterval);
+      const btn = document.getElementById('build-btn');
+      btn.disabled = false;
+      btn.innerHTML = '🚀 Crea EFI vera, non finta';
+      
+      if(data.result && data.result.success){
+        document.getElementById('status-badge').className = 'status-badge status-success';
+        document.getElementById('status-badge').innerHTML = '● Fatto! EFI vera pronta!';
+        
+        const smbios = data.result.smbios;
+        document.getElementById('smbios-preview').style.display = 'block';
+        document.getElementById('smbios-preview').innerHTML = `
+          <strong style="color:#30d158;">🎉 Fatto! EFI vera generata!</strong><br><br>
+          <strong>Model:</strong> ${smbios.ProductName}<br>
+          <strong>Serial:</strong> ${smbios.SerialNumber}<br>
+          <strong>MLB:</strong> ${smbios.MLB}<br>
+          <strong>UUID:</strong> ${smbios.SystemUUID}<br>
+          <strong>ROM:</strong> ${smbios.ROM}<br><br>
+          <strong>Dove:</strong> ${data.result.efi_path}<br>
+          <strong>ZIP:</strong> ${data.result.zip_path}<br><br>
+          <em>Ora copia su USB e prova. Se non boota, è BIOS (DVMT 64MB!) - leggi docs/BIOS_GUIDE.md</em>
+        `;
+        
+        const resDiv = document.getElementById('result');
+        resDiv.style.display = 'block';
+        let kextHtml = '<div style="margin-top:10px;"><strong>Kext scaricati (veri, non finti):</strong><br>';
+        for(const [k,v] of Object.entries(data.result.kext_results)){
+          kextHtml += `<span style="color:${v?'#30d158':'#ff453a'}">${v?'✓ vero':'✗ fallito'} ${k}</span> `;
+        }
+        kextHtml += '</div>';
+        resDiv.innerHTML = kextHtml;
+        
+        if(data.validation){
+          resDiv.innerHTML += `<div style="margin-top:10px; padding:10px; background:#222; border-radius:8px; font-size:12px;">
+            <strong>Validazione:</strong> ${data.validation.valid?'✓ Sembra vera, non finta':'✗ Ha problemi'}<br>
+            Kexts: ${data.validation.checks['kexts found']||0}, ACPI: ${data.validation.checks['acpi found']||0}
+          </div>`;
+        }
+      } else {
+        document.getElementById('status-badge').className = 'status-badge status-error';
+        document.getElementById('status-badge').innerHTML = '● Ops, qualcosa è andato storto';
+      }
+    }
+  });
+}
+</script>
+</body>
+</html>
