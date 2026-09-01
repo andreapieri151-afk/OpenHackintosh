@@ -90,10 +90,16 @@ OpenHackintosh **2.0.1 Beta 1** è **solo terminale**: ho tolto GUI e Web Dashbo
 
 ### 1. macOS — doppio click (il più facile)
 
-1. **Download** dello ZIP della release (v2.0.1-beta.1)
+1. **Download** dello ZIP della release (`OpenHackintosh-2.0.1-Beta-1-fixed.zip`, in `releases/`)
 2. **Extract**
 3. **Doppio click su `OpenHackintosh.command`**
 4. Si apre il Terminale e parte automaticamente OpenHackintosh
+
+> ℹ️ In `releases/` trovi due ZIP della **stessa versione 2.0.1 Beta 1**:
+> `OpenHackintosh-2.0.1-Beta-1.zip` è la build originale,
+> `OpenHackintosh-2.0.1-Beta-1-fixed.zip` è la stessa build con il selettore
+> del menu CLI corretto — **usa quest'ultima**.
+> Dettagli: [`docs/HOTFIX-2.0.1-Beta-1-SELECTOR.md`](docs/HOTFIX-2.0.1-Beta-1-SELECTOR.md).
 
 Se macOS non lo esegue (o il file `.command` ha perso il bit eseguibile), apri Terminale nella cartella e lancia:
 
@@ -148,6 +154,31 @@ cd cartella_estratta
 ```
 
 Tutte le opzioni sono visibili con `./openhackintosh --help`.
+
+### Come si usa il menu interattivo
+
+| Tasto | Azione |
+|---|---|
+| `↑` `↓` (o `Tab`) | Sposta la selezione (con wrap-around) |
+| `Invio` | Conferma la voce evidenziata |
+| `1` … `9` | Seleziona subito l'opzione corrispondente |
+| `1` poi `0` | Seleziona l'opzione **10** (i numeri multi-cifra funzionano) |
+| `Backspace` | Cancella l'ultima cifra digitata |
+| `Home` / `End` | Vai alla prima / ultima voce |
+| `ESC` o `q` | Esci dal menu |
+| `Ctrl+C` | Interrompi |
+
+Se digiti una cifra che potrebbe iniziare un numero più lungo (es. `1` con 10+
+opzioni), il menu mostra `Numero: 1_` e aspetta: premi la cifra successiva,
+`Invio` per confermare `1`, oppure lascia scadere il timeout.
+
+Quando stdin non è un terminale (pipe, script, CI) il menu diventa un elenco
+numerato letto riga per riga, con lo stesso supporto multi-cifra:
+
+```bash
+echo 8 | ./openhackintosh     # esegue "Doctor"
+echo 10 | ./openhackintosh    # esce
+```
 
 ---
 
