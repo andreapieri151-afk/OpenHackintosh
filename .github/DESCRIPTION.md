@@ -5,7 +5,7 @@
 **Opzione 1 - Consigliata, più umana e future-proof:**
 
 ```
-OpenHackintosh - Crea EFI Hackintosh vere che bootano davvero. Nato per Fujitsu Q556/2 perché mi ero rotto di file finti, ora supporta Q957 e presto altri mini PC (Lenovo Tiny, HP Mini, Dell Micro). Download reali da GitHub ufficiale, config giusti, basta fuffa. Tool universale in espansione.
+OpenHackintosh - Crea EFI Hackintosh vere che bootano davvero, da terminale. Nato per Fujitsu Q556/2 perché mi ero rotto di file finti, ora supporta Q957 e presto altri mini PC (Lenovo Tiny, HP Mini, Dell Micro). Download reali da GitHub ufficiale, config giusti, basta fuffa. CLI-only, tool universale in espansione.
 ```
 
 **Opzione 2 - Più corta:**
@@ -17,7 +17,7 @@ Tool che crea EFI Hackintosh vere, non finte. Nato per Q556/2, ora universale. S
 **Opzione 3 - Tecnica ma umana:**
 
 ```
-OpenHackintosh: genera EFI bootabili con file veri da GitHub ufficiale. Fix per file finti/vuoti. Supporta Fujitsu Q556/2, Q957, in arrivo Lenovo ThinkCentre Tiny, HP EliteDesk Mini, Dell OptiPlex Micro e altri. GUI, CLI, Web.
+OpenHackintosh: genera EFI bootabili con file veri da GitHub ufficiale. Fix per file finti/vuoti. CLI da terminale con hardware detection, compatibilità e database profili. Supporta Fujitsu Q556/2, Q957, in arrivo Lenovo ThinkCentre Tiny, HP EliteDesk Mini, Dell OptiPlex Micro e altri.
 ```
 
 ## Come impostarla (devi farlo manualmente, il bot non ha permessi admin)
@@ -42,7 +42,7 @@ kaby-lake
 mini-pc
 real-files
 python
-customtkinter
+cli
 ventura
 sonoma
 ```

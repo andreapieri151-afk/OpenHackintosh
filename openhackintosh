@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# OpenHackintosh 2.0.1 Beta 1 — launcher CLI (Linux/macOS)
+# Non usa path assoluti: lavora nella directory del progetto.
+
+cd "$(dirname "$0")" || exit 1
+
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "❌ Python3 non trovato."
+    echo "   macOS: https://www.python.org/downloads/ oppure 'brew install python'"
+    echo "   Linux: installa python3 con il gestore pacchetti della tua distro"
+    exit 1
+fi
+
+if [ ! -d .venv ]; then
+    echo "Creo ambiente Python (.venv)..."
+    if ! python3 -m venv .venv; then
+        echo "❌ Impossibile creare .venv con python3 -m venv."
+        echo "   Prova: python3 -m ensurepip --upgrade   poi rilancia."
+        exit 1
+    fi
+fi
+
+if [ ! -x .venv/bin/python ]; then
+    echo "❌ .venv esiste ma è incompleto. Rimuovi la cartella .venv e riprova."
+    exit 1
+fi
+
+# Dipendenze (best effort, silenziose se già ok)
+if ! .venv/bin/python -c "import requests" >/dev/null 2>&1; then
+    echo "Installo dipendenze (requests)..."
+    .venv/bin/python -m pip install -r requirements.txt -q \
+        || .venv/bin/python -m pip install requests -q \
+        || {
+            echo "❌ Installazione dipendenze fallita."
+            exit 1
+        }
+fi
+
+exec .venv/bin/python main.py "$@"

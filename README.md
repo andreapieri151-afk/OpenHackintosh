@@ -2,7 +2,7 @@
 
 > *"Basta EFI finte che non bootano nemmeno a pagarle"*
 
-Ciao! Sono Andrea, e questo è **OpenHackintosh** - il tool che crea EFI Hackintosh .
+Ciao! Sono Andrea, e questo è **OpenHackintosh** - il tool che crea EFI Hackintosh **vere** che bootano davvero.
 
 ### La storia (veloce, promesso)
 
@@ -14,11 +14,13 @@ Così l'ho riscritto da zero, ma **per bene**. Con file veri scaricati da GitHub
 
 **Ora supporta Q556/2 e Q957, e nei prossimi giorni aggiungerò altri dispositivi** - mini PC, laptop, desktop Skylake/Kaby Lake/Coffee Lake. Se hai un PC e vuoi che lo supporti, apri una issue con il modello e lo aggiungo.
 
+> ⚠️ **Questa è una BETA.** La versione distribuita è **OpenHackintosh 2.0.1 Beta 1**: è un checkpoint stabile usato per iniziare a distribuire il progetto, ma il supporto hardware è ancora **sperimentale**. Non aspettarti che ogni PC booti al primo colpo; testa su hardware reale e apri issue con i log.
+
 ---
 
 ## Cosa fa, in pratica?
 
-Tu scegli il tuo PC, clicchi un bottone, lui fa tutto:
+Tu scrivi un comando da terminale, lui fa tutto:
 
 1. **Scarica OpenCore vero** da Acidanthera (non un file di testo rinominato .efi)
 2. **Scarica i kext veri** - Lilu, VirtualSMC, WhateverGreen, AppleALC... con i binari dentro
@@ -72,54 +74,80 @@ Li aggiungo in ordine di richiesta.
 
 L'idea è fare un **tool universale** che non sia legato a un solo PC. Un posto dove:
 
-- Scegli il tuo hardware da una lista
+- Rileva il tuo hardware da solo (se possibile)
+- Scegli/identifica il profilo dal database
 - Scegli macOS target
-- Clicchi e ti fa EFI vera con download ufficiali
+- Esegui un comando e ti genera EFI vera con download ufficiali
 - Non devi più cercare kext a mano
 
-Un po' come OpCore-Simplify ma più semplice, più umano, con GUI bella e con focus su mini PC (che sono i migliori per Hackintosh secondo me - piccoli, silenziosi, consumano poco).
+Un po' come OpCore-Simplify ma più semplice, più umano, con CLI chiara e con focus su mini PC (che sono i migliori per Hackintosh secondo me - piccoli, silenziosi, consumano poco).
 
 ---
 
-## Come si usa? (3 modi)
+## Come si usa? (da terminale)
 
-### 1. Doppio click su macOS (il più facile)
+OpenHackintosh **2.0.1 Beta 1** è **solo terminale**: ho tolto GUI e Web Dashboard per mantenere il tool semplice, testabile e senza dipendenze inutili.
 
-Scarica release, scompatta, doppio click su `FujitsuEFI.command` (lo rinominerò in OpenHackintosh.command presto). Se mancano dipendenze te le installa da solo.
+### 1. macOS — doppio click (il più facile)
 
-### 2. GUI Python
+1. **Download** dello ZIP della release (v2.0.1-beta.1)
+2. **Extract**
+3. **Doppio click su `OpenHackintosh.command`**
+4. Si apre il Terminale e parte automaticamente OpenHackintosh
 
-```bash
-git clone https://github.com/andreapieri151-afk/OpenHackintosh.git
-cd OpenHackintosh
-pip install -r requirements.txt
-python3 main.py
-```
-
-Scegli PC, macOS (Ventura consigliato per Q556/2), SMBIOS (iMac18,1 per iniziare), audio layout (11 di solito va), clicchi "Crea EFI vera, non finta". Vedi log live e ZIP finale.
-
-### 3. Terminale (per chi si sente hacker)
+Se macOS non lo esegue (o il file `.command` ha perso il bit eseguibile), apri Terminale nella cartella e lancia:
 
 ```bash
-# Vedi cosa supporta ora
-python3 src/cli.py --list-profiles
-
-# EFI base Q556/2 Ventura
-python3 src/cli.py --profile Q556/2 --macos "Ventura 13.x" --smbios iMac18,1
-
-# EFI Sonoma con WiFi Intel
-python3 src/cli.py --profile Q556/2 --macos "Sonoma 14.x" --smbios iMacPro1,1 --wifi --bluetooth
-
-# Per Q957
-python3 src/cli.py --profile Q957 --macos "Ventura 13.x"
+chmod +x OpenHackintosh.command
+./OpenHackintosh.command
 ```
 
-### 4. Web (Linux o per fare il figo)
+oppure, senza necessità di eseguibilità:
 
 ```bash
-python3 app.py
-# http://localhost:5000
+bash OpenHackintosh.command
 ```
+
+### 2. Linux / macOS — terminale
+
+```bash
+cd cartella_estratta
+
+# Avvio automatico (menu interattivo o con argomenti)
+./openhackintosh.sh                 # Linux
+./OpenHackintosh.command            # macOS
+./openhackintosh
+
+# Menu interattivo
+./openhackintosh
+
+# Rileva hardware reale
+./openhackintosh detect
+
+# Diagnosi completa (hardware + matching + compatibilità)
+./openhackintosh diagnose
+
+# Output JSON (per script/CI/AI)
+./openhackintosh diagnose --json
+
+# Controlla compatibilità con il database
+./openhackintosh compatibility
+
+# Genera EFI hardware-aware
+./openhackintosh generate
+
+# Valida una EFI già generata
+./openhackintosh validate output/EFI
+
+# Guida BIOS per profilo
+./openhackintosh bios --profile fujitsu_q556_2
+
+# Profili database
+./openhackintosh database list
+./openhackintosh database show fujitsu_q556_2
+```
+
+Tutte le opzioni sono visibili con `./openhackintosh --help`.
 
 ---
 
@@ -147,14 +175,17 @@ Se incasini tutto: togli batteria CMOS 10 minuti o sposta jumper BIOS.
 
 ```
 EFI/
-├── BOOT/BOOTx64.efi (vero, 50KB+)
+├── BOOT/BOOTx64.efi (vero, PE/COFF)
 └── OC/
-    ├── ACPI/ -> SSDT-PLUG, EC-USBX, AWAC, PMC (veri da Dortania)
-    ├── Drivers/ -> HfsPlus, OpenRuntime, OpenCanopy (veri)
+    ├── ACPI/ -> SSDT-PLUG-DRTNIA, SSDT-EC-USBX-DESKTOP (veri, dal profilo)
+    ├── Drivers/ -> HfsPlus, OpenRuntime (padrone; driver opzionali solo se richiesti)
     ├── Kexts/ -> Lilu, VirtualSMC, WhateverGreen, AppleALC, RealtekRTL8111 (veri con binari)
-    ├── OpenCore.efi (vero, 1MB+)
+    ├── OpenCore.efi (vero, PE/COFF)
     └── config.plist (fatto bene per il tuo hardware, non a caso)
 ```
+
+I componenti opzionali vengono inclusi **solo se richiesti** (`--include-nvme`,
+`--include-restrict-events`, `--include-optional-drivers`, `--wifi`, `--bluetooth`).
 
 ---
 
@@ -176,23 +207,29 @@ Guida completa in docs/.
 
 ## Kext inclusi
 
-- **Lilu, VirtualSMC, WhateverGreen, AppleALC** - base, obbligatori
-- **RealtekRTL8111 / IntelMausi** - LAN (auto in base a PC)
-- **NVMeFix, RestrictEvents** - utili
-- **Intel WiFi/BT** - opzionali
+- **Lilu, VirtualSMC, WhateverGreen, AppleALC** — base, obbligatori
+- **RealtekRTL8111 / IntelMausi** — LAN (auto in base al profilo)
+- **NVMeFix, RestrictEvents, AirportItlwm, IntelBluetoothFirmware** — **opzionali**, inclusi solo su richiesta esplicita
 
-Tutti da GitHub ufficiale.
+Tutti da GitHub ufficiale, validati (Mach-O) prima di entrare nell'EFI.
 
 ---
 
 ## Roadmap
 
 - [x] Fix file finti -> file veri
-- [x] GUI decente
-- [x] CLI e Web Dashboard
+- [x] CLI chiara e usabile da terminale
 - [x] Supporto Q556/2 e Q957
 - [x] Rinominato OpenHackintosh (da tool singolo a universale)
 - [x] README più umano
+- [x] Rimossa GUI e Web Dashboard (v2.0.1 Beta 1: solo terminale)
+- [x] Hardware Detection (`hardware/detection.py`)
+- [x] Hardware Database JSON (`database/profiles/`)
+- [x] Compatibility Engine deterministico (`compatibility/`)
+- [x] CLI commands: detect, info, diagnose, compatibility, generate, validate, doctor, database
+- [x] Output JSON su tutti i comandi principali
+- [x] EFI validator avanzato (0-byte / placeholder / missing / config consistency)
+- [x] Test automatici base (pytest)
 - [ ] **Nuovi dispositivi nei prossimi giorni** (Q558, Q958, Lenovo Tiny, HP Mini, Dell Micro)
 - [ ] macserial nativo per seriali più furbi
 - [ ] USB mapping automatico
@@ -203,22 +240,16 @@ Tutti da GitHub ufficiale.
 
 ## Come contribuire
 
-Se vuoi aggiungere il tuo PC, è facile:
+Se vuoi aggiungere il tuo PC, è facile (questa versione usa un database JSON):
 
-1. Apri `src/efi_builder/hardware.py`
-2. Aggiungi profilo tipo:
+1. Crea una cartella in `src/database/profiles/` (es. `lenovo_m720q/`)
+2. Aggiungi `profile.json` con: manufacturer, model, board, CPU, GPU, audio, LAN, kext/driver/SSDT, SMBIOS, config e stato:
+   - `VERIFIED` (testato davvero)
+   - `DOCUMENTED` (da documentazione)
+   - `UNSUPPORTED` / `UNKNOWN`
+3. Fai PR con modello, board, LAN, audio, CPU e che profilo hai testato davvero.
 
-```python
-MIO_PC = HardwareProfile(
-    name="Lenovo ThinkCentre M720q",
-    board="... ",
-    lan_kext="IntelMausi.kext",
-    ...
-)
-PROFILES["M720q"] = MIO_PC
-```
-
-3. Fai PR con modello, board, LAN, audio, CPU
+Non inventare compatibilità: se non è testato su hardware reale, scrivi `DOCUMENTED`, mai `VERIFIED`.
 
 Oppure apri issue con il tuo hardware e lo aggiungo io nei prossimi giorni.
 

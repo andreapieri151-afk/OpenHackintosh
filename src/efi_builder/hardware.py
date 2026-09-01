@@ -136,25 +136,30 @@ DRIVERS = {
     "OpenLinuxBoot": {"required": False, "file": "OpenLinuxBoot.efi", "desc": "Linux boot"},
 }
 
-# SSDTs for Q556/2 - based on Dortania Skylake Desktop guide
+# SSDTs for Q556/2 - based on Dortania Skylake Desktop guide.
+# Hardening: SOLO gli SSDT realmente richiesti dal profilo. Niente "just in case".
 SSDTs = {
-    "SSDT-PLUG": {
+    "SSDT-PLUG-DRTNIA": {
         "required": True,
-        "desc": "CPU power management - enables XCPM",
+        "desc": "CPU power management - enables XCPM (DRTNIA variant)",
         "source": "Dortania"
     },
-    "SSDT-EC-USBX": {
+    "SSDT-EC-USBX-DESKTOP": {
         "required": True,
-        "desc": "Fix embedded controller + USB power",
+        "desc": "Fix embedded controller + USB power (Desktop variant)",
         "source": "Dortania"
     },
+}
+
+# Opzionali, aggiunti SOLO se una regola di profilo li richiede esplicitamente.
+SSDT_OPTIONAL = {
     "SSDT-AWAC": {
-        "required": True,
+        "required": False,
         "desc": "Fix AWAC/RTC clocks",
         "source": "Dortania"
     },
     "SSDT-PMC": {
-        "required": True,
+        "required": False,
         "desc": "Fix NVRAM on H110 (PMC)",
         "source": "Dortania"
     },
@@ -173,21 +178,28 @@ MACOS_VERSIONS = {
     "Sequoia 15.x": {"min_oc": "1.0.0", "smbios": ["iMacPro1,1", "Macmini8,1"], "recommended": False, "note": "Experimental, requires OCLP or extra patches"},
 }
 
-def get_kexts_for_profile(profile_name: str, include_wifi: bool = False, include_bluetooth: bool = False):
+def get_kexts_for_profile(profile_name: str,
+                          include_wifi: bool = False,
+                          include_bluetooth: bool = False,
+                          include_nvme: bool = False,
+                          include_restrict_events: bool = False):
+    """Kext obbligatori del profilo + opzionali SOLO se richiesti esplicitamente."""
     profile = PROFILES.get(profile_name, Q556_2)
     kexts = ["Lilu", "VirtualSMC", "WhateverGreen", "AppleALC"]
-    
+
     if profile.lan_kext == "RealtekRTL8111.kext":
         kexts.append("RealtekRTL8111")
     else:
         kexts.append("IntelMausi")
-    
-    # Always useful
-    kexts.extend(["NVMeFix", "RestrictEvents"])
-    
+
+    # Opzionali: mai "just in case".
+    if include_nvme:
+        kexts.append("NVMeFix")
+    if include_restrict_events:
+        kexts.append("RestrictEvents")
     if include_bluetooth:
         kexts.append("IntelBluetoothFirmware")
     if include_wifi:
         kexts.append("AirportItlwm")
-    
+
     return kexts

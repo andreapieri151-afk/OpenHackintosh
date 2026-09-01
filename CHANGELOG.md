@@ -1,5 +1,76 @@
 # Changelog - Tutte le bestemmie in ordine cronologico
 
+## 2.0.1 Beta 1 - 2026-08-31 - CHECKPOINT DI DISTRIBUZIONE (PRERELEASE)
+
+Questa è una **build di distribuzione/checkpoint** dello stato attuale, non una
+nuova fase architetturale. Include:
+
+- **CLI-first workflow**: il tool si usa da terminale, niente GUI/web.
+- **Hardware detection/diagnosis**: detection DMI, CPU, GPU, audio, Ethernet, Wi-Fi, USB, storage, ACPI + report `diagnose`.
+- **Hardware identification + database matching**: `EXACT_MATCH` / `CLOSE_MATCH` / `PARTIAL_MATCH` / `NO_MATCH`, basato su `src/database/`.
+- **Compatibility analysis**: motore deterministico basato su DB/regole/HW-ID, mai su invenzioni AI.
+- **EFI generator hardening**: binari reali, validazione Mach-O/PE/COFF/AML, config↔file consistency, zero-byte/placeholder detection, SHA-256, cache, final EFI audit, clean failure.
+- **No fake binaries**: se un componente obbligatorio non è ottenibile/verificato, la generazione **fallisce**.
+- **Migliorata gestione errori** e output JSON strutturato.
+
+> ⚠️ BETA: il supporto è sperimentale. Nessun profilo viene dichiarato VERIFIED
+> senza test fisico sul hardware. Il profilo Q556/2 è marcato VERIFIED dal
+> creatore del progetto; Q957 è DOCUMENTED.
+
+## [Unreleased] - 2026-08-30 - v2.0.2 in preparazione (NON PUBBLICATA)
+
+### Rimosso GUI e Web Dashboard: solo terminale
+
+- Rimosso `src/gui/` (GUI customtkinter/tkinter)
+- Rimosso `app.py`, `run_web.py`, `templates/`, `static/` (Web Dashboard Flask)
+- `main.py` ora è un wrapper che gira direttamente la CLI
+- `src/cli.py`: rimossa opzione `--gui`, epilog aggiornato
+- `FujitsuEFI.command`: avvio diretto da terminale, niente più tentativo GUI
+- `requirements.txt`: rimossi `flask`, `customtkinter`, `pillow`, `packaging`; resta `requests`
+- README, CONTRIBUTING, `.github/DESCRIPTION.md` aggiornati: il progetto è CLI-only
+
+### EFI Generator Hardening (2.0.2)
+
+- **NO FAKE BINARIES**: nessun placeholder/fake se un componente obbligatorio non è ottenibile/verificato.
+- **Binary validation** (`src/efi/integrity.py`): Mach-O per kext, PE/COFF per driver/OpenCore/BOOTx64, firma AML per SSDT.
+- **Hash / Integrity**: SHA-256, versione/source, download time per ogni componente.
+- **Download cache** (`~/.cache/openhackintosh`): riusa zip solo se integro; invalida e ri-scarica se corrotti.
+- **Config.plist consistency**: cross-reference ACPI/Kext/Driver config <-> file realmente presenti.
+- **Zero-byte / placeholder scan** ricorsiva globale.
+- **Component Selection minimale**: di default SOLO required. Opzionali espliciti (`--wifi`, `--bluetooth`, `--include-nvme`, `--include-restrict-events`, `--include-optional-drivers`).
+- **SSDT da profilo**: Q556/2/Q957 usano `SSDT-PLUG-DRTNIA.aml` e `SSDT-EC-USBX-DESKTOP.aml`; niente AWAC/RHUB automatici.
+- **DeviceProperties dal profilo** (no valori inventati).
+- **Release vs Dev**: release boot-args pulito; `--dev` abilita debug.
+- **Final EFI Audit** (`src/efi/audit.py`) + **generation/failure report** (`VALID` / `FAILED`).
+- Interfaccia `generate --json` ora produce JSON pulito (log nascosti in json mode).
+- Test di hardening (37 totali) per download failure, fake/invalid binaries, 0-byte, missing kext/driver/ACPI, config mismatch, exit code, Q556/2.
+
+### Hardware Detection / Identification / Diagnosis (2.0.2)
+
+- `DetectedValue` ora espone `value` / `status` / `source`: `DETECTED`, `INFERRED`, `DATABASE_MATCH`, `NOT_DETECTED`, `UNKNOWN`, `NOT_AVAILABLE_ON_PLATFORM`. Se non rilevato: `value: null`.
+- Detection arricchita: CPU vendor/architettura/generazione/cores/threads/features; GPU vendor/model/ids/PCI/type/VRAM best-effort; Audio, Ethernet, Wi-Fi con vendor/model/ids/PCI; Bluetooth best-effort (USB/PCI); USB controllers + devices; Storage SATA/NVMe/drives; ACPI tables + DSDT; boot mode UEFI/Legacy.
+- **HardwareSnapshot** (`src/hardware/snapshot.py`): rileva una sola volta e condivide detection ↔ matching ↔ compatibility.
+- Matcher: `match_type` = `EXACT_MATCH` / `CLOSE_MATCH` / `PARTIAL_MATCH` / `NO_MATCH`.
+- Compatibility: `ComponentAssessment.evidence` (Detected / Hardware ID match / Database profile / Documented / Tested) e `match_type` nel JSON.
+- `openhackintosh diagnose`: report completo (SYSTEM, CPU, GPU, Audio, Ethernet, Wi-Fi, Storage, DATABASE, DIAGNOSIS, macOS Compatibility, Overall, NOTE). `diagnose --json` produce solo JSON.
+- Error handling: la diagnosi continua se una singola sezione di rilevamento fallisce (`detection_errors` tracciato).
+- NON toccato il generatore EFI in questa fase.
+
+### Fondazione intelligente (2.0.2)
+
+- **Hardware Detection** (`src/hardware/detection.py`): rileva DMI, CPU, GPU/PCI, audio, Ethernet, WiFi, USB, storage, ACPI; MAI inventa, altrimenti "Unknown / Not detected".
+- **Hardware Identification** (`src/hardware/identification.py`): identità confrontabile.
+- **Hardware Database JSON** (`src/database/profiles/`): profili `fujitsu_q556_2` e `fujitsu_q957` con stato VERIFIED / DOCUMENTED / UNKNOWN.
+- **Database Loader + Matcher** (`src/database/`): caricamento autonomo e matching deterministico per modello/board/HW ID.
+- **Compatibility Engine** (`src/compatibility/`): confronto hardware vs profilo con stati compatible/partial/unsupported/unknown. Non usa AI per decidere.
+- **AI Layer** (`src/ai/`): solo spiegazione sopra il risultato del motore.
+- **EFI Generator hardware-aware** (`src/efi/` + `src/efi_builder/builder.py`): include solo componenti necessari; il download di un componente obbligatorio che fallisce ABORTA, non crea placeholder.
+- **EFI Validator avanzato** (`src/efi_builder/validator.py`): rileva 0-byte, placeholder, missing, componenti configurati ma assenti, config/file inconsistency.
+- **CLI commands**: `detect`, `info`, `diagnose`, `compatibility`, `generate`, `validate`, `doctor`, `database`, `bios`, `ask`.
+- **Output JSON** su tutti i comandi principali; `--dev` per verbose/debug.
+- **Guida BIOS per profilo**: `openhackintosh bios --profile fujitsu_q556_2`, solo impostazioni pertinenti, con "requires hardware verification".
+- **Tests pytest** (24): detection, database, matching, compatibility, validator 0-byte/placeholder/missing, CLI JSON, reference Q556/2.
+
 ## [2.1.0] - 2026-08-29 - OpenHackintosh 🍎
 
 ### Perché ho cambiato nome?
