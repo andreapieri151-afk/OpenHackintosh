@@ -181,8 +181,12 @@ class KeyReader:
         select(timeout) sul pty slave talvolta non scadono piu' (neanche a
         fette da 0.1s). Con fd O_NONBLOCK + polling con sleep il
         comportamento e' deterministico e identico a prima per il chiamante.
+        La variabile OPENHACKINTOSH_FORCE_POLL=1 forza il polling ovunque
+        (debug/test su altre piattaforme).
         """
-        return sys.platform == "darwin"
+        return sys.platform == "darwin" or bool(
+            os.environ.get("OPENHACKINTOSH_FORCE_POLL")
+        )
 
     # -- context manager ---------------------------------------------------
     def __enter__(self) -> "KeyReader":

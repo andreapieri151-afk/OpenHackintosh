@@ -116,12 +116,6 @@ def main() -> int:
     return 0
 
 
-if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1] == "keyreader":
-        sys.exit(main_keyreader())
-    sys.exit(main())
-
-
 def main_keyreader() -> int:
     """Sonda il KeyReader REALE (poll mode) dentro un pty figlio."""
     import select as sel
@@ -131,14 +125,16 @@ def main_keyreader() -> int:
     child_code = (
         "import sys; sys.path.insert(0, %r)\n"
         "from cli.selector import KeyReader\n"
+        "import time\n"
         "r = KeyReader()\n"
+        "print('MODE:', sys.platform, 'poll=', r._poll_mode, flush=True)\n"
         "with r:\n"
         "    k1 = r.read_key()\n"
-        "    print('KEY1:', repr(k1), flush=True)\n"
+        "    print('KEY1:', repr(k1), 't=' + format(time.monotonic(), '.2f'), flush=True)\n"
         "    k2 = r.read_key(timeout=0.8)\n"
-        "    print('KEY2:', repr(k2), flush=True)\n"
+        "    print('KEY2:', repr(k2), 't=' + format(time.monotonic(), '.2f'), flush=True)\n"
         "    k3 = r.read_key(timeout=0.8)\n"
-        "    print('KEY3:', repr(k3), flush=True)\n"
+        "    print('KEY3:', repr(k3), 't=' + format(time.monotonic(), '.2f'), flush=True)\n"
         "print('KR-DONE', flush=True)\n"
     ) % src
 
@@ -191,3 +187,10 @@ def main_keyreader() -> int:
     print("::error ::" + msg)
     print(msg)
     return 0
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "keyreader":
+        sys.exit(main_keyreader())
+    sys.exit(main())
+
+
