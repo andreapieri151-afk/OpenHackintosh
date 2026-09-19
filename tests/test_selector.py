@@ -429,7 +429,6 @@ sys.stdout.flush()
 
 
 def _run_in_pty(keys, count=10, timeout=15.0, key_delay=0.2):
-    import select as _select
     import pty as _pty
 
     src = str(__import__("pathlib").Path(__file__).resolve().parents[1] / "src")
@@ -439,19 +438,29 @@ def _run_in_pty(keys, count=10, timeout=15.0, key_delay=0.2):
         os.environ["TERM"] = "xterm-256color"
         os.execv(sys.executable, [sys.executable, "-c", code, str(count)])
 
+    # Il padre legge il master SENZA select(): sui runner macOS select() ha
+    # wake-up irregolari sui pty (dimostrato con sonda dedicata: una chiamata
+    # scade, la successiva si impalla a caso). fd non-bloccante + polling con
+    # sleep e' deterministico ovunque e non perde l'output del figlio.
+    try:
+        os.set_blocking(fd, False)
+    except Exception:
+        pass
+
     def _drain(max_wait):
         nonlocal buf
         deadline = time.time() + max_wait
         while time.time() < deadline:
-            if not _select.select([fd], [], [], 0.05)[0]:
-                return
             try:
                 chunk = os.read(fd, 4096)
+            except BlockingIOError:
+                chunk = b""
             except OSError:
                 return
-            if not chunk:
-                return
-            buf += chunk
+            if chunk:
+                buf += chunk
+                continue  # potrebbe arrivare altro subito
+            time.sleep(0.02)
 
     buf = b""
     try:

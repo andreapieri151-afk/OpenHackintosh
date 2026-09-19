@@ -69,22 +69,29 @@ def main() -> int:
     buf = b""
     output_lines = []
 
+    # Padre senza select(): stessa inaffidabilita' dei runner macOS.
+    try:
+        os.set_blocking(fd, False)
+    except Exception:
+        pass
+
     def drain(wait):
         nonlocal buf
         deadline = time.time() + wait
         while time.time() < deadline:
-            if not sel.select([fd], [], [], 0.05)[0]:
-                return
             try:
                 chunk = os.read(fd, 4096)
+            except BlockingIOError:
+                chunk = b""
             except OSError:
                 return
-            if not chunk:
-                return
-            buf += chunk
-            while b"\n" in buf:
-                line, buf = buf.split(b"\n", 1)
-                output_lines.append(line.decode(errors="replace").strip())
+            if chunk:
+                buf += chunk
+                while b"\n" in buf:
+                    line, buf = buf.split(b"\n", 1)
+                    output_lines.append(line.decode(errors="replace").strip())
+                continue
+            time.sleep(0.02)
 
     try:
         # il figlio manda prima SELECT1 (attende input); diamogli il byte
@@ -143,22 +150,28 @@ def main_keyreader() -> int:
     buf = b""
     lines = []
 
+    try:
+        os.set_blocking(fd, False)
+    except Exception:
+        pass
+
     def drain(wait):
         nonlocal buf
         deadline = time.time() + wait
         while time.time() < deadline:
-            if not sel.select([fd], [], [], 0.05)[0]:
-                return
             try:
                 chunk = os.read(fd, 4096)
+            except BlockingIOError:
+                chunk = b""
             except OSError:
                 return
-            if not chunk:
-                return
-            buf += chunk
-            while b"\n" in buf:
-                line, buf = buf.split(b"\n", 1)
-                lines.append(line.decode(errors="replace").strip())
+            if chunk:
+                buf += chunk
+                while b"\n" in buf:
+                    line, buf = buf.split(b"\n", 1)
+                    lines.append(line.decode(errors="replace").strip())
+                continue
+            time.sleep(0.02)
 
     try:
         drain(1.5)
