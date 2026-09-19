@@ -37,7 +37,7 @@ from .commands import (
     run_bios,
 )
 
-VERSION = "2.0.1 Beta 1"
+from version import VERSION_LABEL as VERSION  # unica fonte: src/version.py
 
 
 def build_parser() -> argparse.ArgumentParser:

@@ -15,9 +15,14 @@ from typing import Any, Dict, List, Optional
 
 
 def supports_color() -> bool:
-    if os.environ.get("NO_COLOR"):
-        return False
-    return sys.stdout.isatty() and os.environ.get("TERM") != "dumb"
+    """Unica logica ANSI del progetto: vedi :func:`utils.console.ansi_supported`.
+
+    Su Windows i colori escono solo se la console supporta il VT mode
+    (attivato automaticamente all'avvio su Windows 10+).
+    """
+    from utils.console import ansi_supported
+
+    return ansi_supported(sys.stdout)
 
 
 class Out:

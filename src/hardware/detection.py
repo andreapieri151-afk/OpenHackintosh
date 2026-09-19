@@ -10,9 +10,13 @@ Regole rigorose:
     UNKNOWN   -> non disponibile
 
 Supporto:
-- Linux (sysfs, lspci, dmi)  -> implementato e testabile in sandbox
-- macOS / BSD               -> best effort (non ancora testato su hardware reale)
-- Windows                   -> non disponibile in questa release
+- Linux (sysfs, lspci, dmi)      -> implementato e testabile in sandbox
+- Windows (PowerShell CIM)       -> implementato (hardware/windows.py)
+- macOS / BSD                    -> best effort (vedi README/documentazione)
+
+Ogni sezione fa dispatch per piattaforma: Linux/macos usano il codice
+esistente, Windows delega al provider PowerShell (una sola invocazione
+batched, cache di sessione). I moduli chiamanti non cambiano.
 """
 
 from __future__ import annotations
@@ -136,7 +140,11 @@ def _read_sysfs(path: str) -> str:
 # ---------------------------------------------------------------------------
 
 def detect_dmi() -> Dict[str, DetectedValue]:
-    """Legge SMBIOS/DMI dove disponibile (Linux)."""
+    """Legge SMBIOS/DMI dove disponibile (Linux sysfs, Windows via CIM)."""
+    if platform.system().lower() == "windows":
+        from .windows import detect_dmi_windows
+
+        return detect_dmi_windows()
     base = "/sys/class/dmi/id"
     keys = {
         "system_vendor": "system_vendor",
@@ -186,6 +194,10 @@ def _infer_cpu_generation(model: str) -> str:
 
 
 def detect_cpu() -> Dict[str, DetectedValue]:
+    if platform.system().lower() == "windows":
+        from .windows import detect_cpu_windows
+
+        return detect_cpu_windows()
     info: Dict[str, DetectedValue] = {}
 
     # platform.processor()
@@ -359,11 +371,21 @@ def _clear_pci_cache() -> None:
     """Svuota la cache PCI (usata nei test e quando si vuole una detection fresca)."""
     global _PCI_GROUPED_CACHE
     _PCI_GROUPED_CACHE = None
+    if platform.system().lower() == "windows":
+        from .windows import _clear_windows_cache
+
+        _clear_windows_cache()
 
 
 def _pci_grouped() -> Dict[str, List[Dict[str, Any]]]:
     global _PCI_GROUPED_CACHE
     if _PCI_GROUPED_CACHE is not None:
+        return _PCI_GROUPED_CACHE
+    if platform.system().lower() == "windows":
+        # Stesso schema dei dict lspci, sorgente PowerShell CIM (vedi windows.py).
+        from .windows import _pci_grouped_windows
+
+        _PCI_GROUPED_CACHE = _pci_grouped_windows()
         return _PCI_GROUPED_CACHE
     text = _run([_lspci_bin() or "lspci", "-nn", "-D"])
     grouped: Dict[str, List[Dict[str, Any]]] = {}
@@ -444,7 +466,12 @@ def _lsusb_available() -> bool:
 
 
 def detect_usb_devices() -> Dict[str, DetectedValue]:
-    """Dispositivi USB da lsusb (best effort Linux). Mai inventare."""
+    """Dispositivi USB da lsusb (Linux) / PnP (Windows). Mai inventare."""
+    if platform.system().lower() == "windows":
+        from .windows import detect_usb_windows
+
+        out = detect_usb_windows()
+        return {k: v for k, v in out.items() if k in ("usb_devices", "usb_count")}
     if not _lsusb_available():
         return {"usb_devices": unknown(), "usb_count": unknown()}
     text = _run(["lsusb"])
@@ -499,7 +526,11 @@ def detect_usb_controllers() -> Dict[str, DetectedValue]:
 
 
 def detect_bluetooth() -> Dict[str, DetectedValue]:
-    """Bluetooth best effort: USB o PCI con nome Bluetooth. Non inventa nulla."""
+    """Bluetooth best effort: USB o PCI/PnP con nome Bluetooth. Non inventa nulla."""
+    if platform.system().lower() == "windows":
+        from .windows import detect_bluetooth_windows
+
+        return detect_bluetooth_windows()
     # 1. USB Bluetooth
     if _lsusb_available():
         text = _run(["lsusb"])
@@ -549,6 +580,10 @@ def detect_sata_nvme_controllers() -> Dict[str, DetectedValue]:
 # ---------------------------------------------------------------------------
 
 def detect_storage() -> Dict[str, DetectedValue]:
+    if platform.system().lower() == "windows":
+        from .windows import detect_storage_windows
+
+        return detect_storage_windows()
     disks: List[str] = []
     base = Path("/sys/block")
     try:
@@ -566,6 +601,10 @@ def detect_storage() -> Dict[str, DetectedValue]:
 
 
 def detect_net_interfaces() -> Dict[str, DetectedValue]:
+    if platform.system().lower() == "windows":
+        from .windows import detect_net_interfaces_windows
+
+        return detect_net_interfaces_windows()
     out = _run(["ip", "-o", "link", "show"])
     if not out:
         return {"net_interfaces": unknown()}
@@ -670,9 +709,10 @@ def detect_platform() -> Dict[str, DetectedValue]:
         "machine": detected(platform.machine()),
         "python": detected(platform.python_version()),
     }
-    # UEFI vs Legacy: indizio forte solo su Linux (sysfs). Su macOS/Windows non
-    # lo simuliamo: NOT_AVAILABLE_ON_PLATFORM.
-    if platform.system().lower() == "linux":
+    # UEFI vs Legacy: indizio forte su Linux (sysfs), via registry su Windows
+    # (PEFirmwareType, vedi hardware/windows.py). Su macOS: NOT_AVAILABLE.
+    system = platform.system().lower()
+    if system == "linux":
         efi_dir = Path("/sys/firmware/efi")
         try:
             if efi_dir.exists():
@@ -681,6 +721,10 @@ def detect_platform() -> Dict[str, DetectedValue]:
                 out["uefi_mode"] = deduced("Legacy BIOS")
         except Exception:
             out["uefi_mode"] = unknown()
+    elif system == "windows":
+        from .windows import detect_uefi_windows
+
+        out["uefi_mode"] = detect_uefi_windows()
     else:
         out["uefi_mode"] = not_available("UEFI/Legacy detection via sysfs not available on this platform")
     return out

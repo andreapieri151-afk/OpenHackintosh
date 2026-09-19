@@ -21,10 +21,15 @@ from __future__ import annotations
 
 import codecs
 import os
-import select as _select
 import sys
+import time
 from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional, Sequence
+
+if os.name == "posix":
+    import select as _select
+else:  # Windows: select() non funziona su file descriptor, solo su socket.
+    _select = None  # type: ignore[assignment]
 
 # --------------------------------------------------------------------------
 # Token dei tasti
@@ -75,6 +80,30 @@ ESCAPE_SEQUENCES: Dict[str, str] = {
     "\x1bOM": KEY_ENTER,    # Enter del tastierino numerico
     "\x1b[3~": KEY_BACKSPACE,  # Canc
 }
+
+#: Mappa dei tasti estesi della console Windows (``msvcrt``).
+#: Su Windows i tasti speciali NON arrivano come sequenze di escape: il primo
+#: ``getwch()`` restituisce ``\x00`` o ``\xe0`` e il secondo il codice qui sotto.
+WINDOWS_EXTENDED_KEYS: Dict[str, str] = {
+    "H": KEY_UP,
+    "P": KEY_DOWN,
+    "K": KEY_LEFT,
+    "M": KEY_RIGHT,
+    "G": KEY_HOME,
+    "O": KEY_END,
+    "I": KEY_PGUP,
+    "Q": KEY_PGDN,
+    "S": KEY_BACKSPACE,  # Canc
+    "R": KEY_UNKNOWN,    # Insert (ignorato)
+}
+
+
+def decode_windows_extended(code: Optional[str]) -> str:
+    """Traduce il secondo codice di un tasto esteso Windows in un token."""
+    if not code:
+        return KEY_UNKNOWN
+    return WINDOWS_EXTENDED_KEYS.get(code, KEY_UNKNOWN)
+
 
 #: Caratteri singoli -> token.
 CONTROL_KEYS: Dict[str, str] = {
@@ -228,6 +257,110 @@ class KeyReader:
             if len(seq) > 12:  # pragma: no cover - sequenza malformata
                 break
         return decode_key(seq)
+
+
+# --------------------------------------------------------------------------
+# Lettura tastiera su Windows (msvcrt)
+# --------------------------------------------------------------------------
+
+
+class WindowsKeyReader:
+    """Lettore di tasti per la console Windows, basato su ``msvcrt``.
+
+    Perche' non KeyReader: su Windows ``termios`` non esiste, ``select()``
+    accetta solo socket e ``os.read(stdin)`` e' line-buffered: i tasti freccia
+    arriverebbero solo dopo Invio, rendendo il menu inutilizzabile.
+    ``msvcrt.getwch()`` invece legge un tasto alla volta dalla console; i tasti
+    speciali arrivano come coppia (``\\x00``/``\\xe0`` + codice) decodificata
+    da :data:`WINDOWS_EXTENDED_KEYS`.
+
+    Stessa interfaccia di :class:`KeyReader` (context manager + read_key), cosi'
+    il loop del selettore non conosce la differenza.
+    """
+
+    #: Attesa massima per il secondo codice di un tasto esteso.
+    escape_timeout = 0.08
+    #: Intervallo di polling per kbhit().
+    poll_interval = 0.01
+
+    def __init__(self) -> None:
+        self._decoder = None  # non serve: getwch() decodifica per noi
+        self._pending: List[str] = []
+
+    # -- context manager -------------------------------------------------
+    def __enter__(self) -> "WindowsKeyReader":
+        # Nessuna modalita' da attivare: la console Windows fornisce i tasti
+        # singoli via msvcrt senza cambiare lo stato del terminale.
+        return self
+
+    def __exit__(self, *exc) -> None:
+        self.restore()
+
+    def restore(self) -> None:
+        return None
+
+    # -- lettura ----------------------------------------------------------
+    def _msvcrt(self):
+        import msvcrt  # import di piattaforma: esiste solo su Windows
+
+        return msvcrt
+
+    def _wait(self, timeout: Optional[float]) -> bool:
+        msvcrt = self._msvcrt()
+        if timeout is None:
+            return True
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if msvcrt.kbhit():
+                return True
+            time.sleep(self.poll_interval)
+        return False
+
+    def _read_char(self, timeout: Optional[float]) -> Optional[str]:
+        if self._pending:
+            return self._pending.pop(0)
+        msvcrt = self._msvcrt()
+        if timeout is None:
+            try:
+                return msvcrt.getwch()
+            except (OSError, EOFError):
+                return None
+        if not self._wait(timeout):
+            return None
+        try:
+            return msvcrt.getwch()
+        except (OSError, EOFError):
+            return None
+
+    def read_key(self, timeout: Optional[float] = None) -> Optional[str]:
+        """Restituisce il prossimo token, oppure ``None`` allo scadere."""
+        ch = self._read_char(timeout)
+        if ch is None:
+            return None
+        # Tasto esteso (frecce, Home/End, PgUp/PgDn, Canc...): secondo codice.
+        if ch in ("\x00", "\xe0"):
+            code = self._read_char(self.escape_timeout)
+            if code is None:
+                return KEY_UNKNOWN
+            # Alcune console mandano prima \xe0 poi \x00: accetta entrambi.
+            if code in ("\x00", "\xe0"):
+                code = self._read_char(self.escape_timeout)
+            return decode_windows_extended(code)
+        # ESC su Windows e' sempre un tasto singolo: niente sequenze CSI/SS3.
+        return decode_key(ch)
+
+
+def make_key_reader(reader: Optional[object] = None):
+    """Sceglie il lettore giusto per la piattaforma corrente.
+
+    Windows -> :class:`WindowsKeyReader`; altrove -> :class:`KeyReader`.
+    Se il chiamante passa un reader custom (test), lo usa senza toccarlo.
+    """
+    if reader is not None:
+        return reader
+    if os.name == "nt":
+        return WindowsKeyReader()
+    return KeyReader()
 
 
 # --------------------------------------------------------------------------
@@ -527,15 +660,15 @@ def is_interactive(stdin=None, stdout=None) -> bool:
 
 
 def supports_ansi(stdout=None) -> bool:
+    """Delega alla fonte unica :func:`utils.console.ansi_supported`.
+
+    Su Windows le sequenze ANSI sono usate solo se il VT mode e' attivo;
+    altrove basta un TTY. ``NO_COLOR`` disattiva sempre.
+    """
+    from utils.console import ansi_supported
+
     stdout = stdout or sys.stdout
-    if os.environ.get("NO_COLOR"):
-        return False
-    if os.environ.get("TERM", "") in ("dumb", ""):
-        return False
-    try:
-        return bool(stdout.isatty())
-    except Exception:
-        return False
+    return ansi_supported(stdout)
 
 
 def select_interactive(
@@ -555,7 +688,7 @@ def select_interactive(
     message = ""
 
     owns_reader = reader is None
-    reader = reader or KeyReader()
+    reader = make_key_reader(reader)
     if owns_reader:
         reader.__enter__()
 

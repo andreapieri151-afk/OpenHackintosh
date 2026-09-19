@@ -3,12 +3,12 @@
 Costruisce lo ZIP di distribuzione di OpenHackintosh.
 
 Uso:
-    python3 tools/build_release.py                       # build standard
+    python3 tools/build_release.py                       # build standard (2.0.1 Stable)
     python3 tools/build_release.py --name ...-fixed.zip  # build con nome custom
 
-Lo ZIP replica esattamente il layout della release 2.0.1 Beta 1:
-codice + launcher + documentazione, senza test, ambienti virtuali o release
-precedenti. Il contenuto e' deterministico (ordinamento stabile dei file).
+Lo ZIP contiene: codice + launcher (macOS/Linux/Windows) + documentazione,
+senza test, ambienti virtuali o release precedenti. Il contenuto e'
+deterministico (ordinamento stabile + timestamp fisso dei file nello ZIP).
 """
 
 from __future__ import annotations
@@ -22,8 +22,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 RELEASES = ROOT / "releases"
 
-DEFAULT_VERSION = "2.0.1 Beta 1"
-DEFAULT_ZIP = "OpenHackintosh-2.0.1-Beta-1.zip"
+DEFAULT_VERSION = "2.0.1 Stable"
+
+#: Timestamp fisso dei file nello ZIP (build riproducibile): data della release.
+ZIP_TIMESTAMP = (2026, 9, 19, 12, 0, 0)
+DEFAULT_ZIP = "OpenHackintosh-2.0.1.zip"
 
 #: File di primo livello inclusi nella distribuzione.
 TOP_LEVEL_FILES = [
@@ -32,6 +35,7 @@ TOP_LEVEL_FILES = [
     "LICENSE",
     "CONTRIBUTING.md",
     "FujitsuEFI.command",
+    "OpenHackintosh.bat",
     "OpenHackintosh.command",
     "README.md",
     "main.py",
@@ -79,14 +83,14 @@ def build(zip_name: str, folder: str, extra: dict[str, str] | None = None) -> Pa
     with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
         for path in files:
             arc = f"{folder}/{path.relative_to(ROOT).as_posix()}"
-            info = zipfile.ZipInfo(arc, date_time=(2026, 9, 1, 12, 0, 0))
+            info = zipfile.ZipInfo(arc, date_time=ZIP_TIMESTAMP)
             info.compress_type = zipfile.ZIP_DEFLATED
             # Preserva il bit di esecuzione per i launcher.
             mode = 0o755 if path.suffix in (".command", ".sh") or path.name == "openhackintosh" else 0o644
             info.external_attr = (mode & 0xFFFF) << 16
             zf.writestr(info, path.read_bytes())
         for name, content in (extra or {}).items():
-            info = zipfile.ZipInfo(f"{folder}/{name}", date_time=(2026, 9, 1, 12, 0, 0))
+            info = zipfile.ZipInfo(f"{folder}/{name}", date_time=ZIP_TIMESTAMP)
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = (0o644 & 0xFFFF) << 16
             zf.writestr(info, content)

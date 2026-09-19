@@ -17,8 +17,11 @@ from typing import List, Optional, Sequence
 from .selector import (  # noqa: F401  (riesportati per compatibilita')
     KeyReader,
     SelectorState,
+    WindowsKeyReader,
     decode_key,
+    decode_windows_extended,
     is_interactive,
+    make_key_reader,
     parse_line_selection,
     render_menu,
     select,
@@ -81,12 +84,15 @@ def run_menu(items: List[dict], title: str = "What would you like to do?",
 def _getch() -> Optional[str]:
     """Compatibilita' con la 2.0.1 Beta 1: legge un singolo tasto.
 
-    Ora usa :class:`cli.selector.KeyReader`, quindi gestisce correttamente
-    ESC isolato e le frecce in application mode.
+    Usa il lettore giusto per la piattaforma (POSIX ``KeyReader`` oppure
+    ``WindowsKeyReader`` su Windows), scelto da :func:`make_key_reader`.
     """
     if not is_interactive():
         return None
-    reader = KeyReader()
+    try:
+        reader = make_key_reader()
+    except Exception:
+        return None
     try:
         with reader:
             return reader.read_key()
