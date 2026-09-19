@@ -22,14 +22,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
-      - name: "A1: selector unit (no pty)"
+      - name: "D1: cifre + multi-cifra"
         if: always()
-        run: python -m pytest tests/test_selector.py -q -k "not pty"
+        run: python -m pytest tests/test_selector.py -q -k "keys0- or keys1- or keys2- or keys3- or keys4- or keys5- or keys6- or keys19- or keys20- or keys21-"
 
-      - name: "A2: selector pty e2e"
+      - name: "D2: frecce CSI/SS3 + ESC/q"
         if: always()
-        run: python -m pytest tests/test_selector.py -q -k pty
+        run: python -m pytest tests/test_selector.py -q -k "keys7- or keys8- or keys9- or keys10- or keys11- or keys12-"
 
-      - name: "A3: pty e2e - solo digit semplici"
+      - name: "D3: input non valido + Tab/Backspace + redraw"
         if: always()
-        run: python -m pytest tests/test_selector.py -q -k "pty and (3 or 9) and a3 or a9"
+        run: python -m pytest tests/test_selector.py -q -k "keys13- or keys14- or keys17- or keys18- or redrawn"
+
+      - name: "D4: Home/End"
+        if: always()
+        run: python -m pytest tests/test_selector.py -q -k "keys15- or keys16-"
