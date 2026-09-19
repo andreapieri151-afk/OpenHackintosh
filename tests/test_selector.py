@@ -537,7 +537,7 @@ def test_pty_end_to_end(keys, expected, count):
         f"result_in_output={'RESULT=' in text}"
     )
     assert got == expected, (
-        f"atteso {expected!r}, ottenuto {got!r} | {diag} | tail={text[-300:]!r}"
+        f"atteso {expected!r}, ottenuto {got!r} | {diag} | FULL={text!r}"
     )
 
 

@@ -25,6 +25,10 @@ jobs:
         if: always()
         run: python tools/pty_probe.py
 
+      - name: "P1: sonda KeyReader reale (poll mode)"
+        if: always()
+        run: python tools/pty_probe.py keyreader
+
       - name: "D1bis: casi timeout keys5/keys21"
         if: always()
         run: |

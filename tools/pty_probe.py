@@ -110,4 +110,71 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "keyreader":
+        sys.exit(main_keyreader())
     sys.exit(main())
+
+
+def main_keyreader() -> int:
+    """Sonda il KeyReader REALE (poll mode) dentro un pty figlio."""
+    import select as sel
+    import pty
+
+    src = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src")
+    child_code = (
+        "import sys; sys.path.insert(0, %r)\n"
+        "from cli.selector import KeyReader\n"
+        "r = KeyReader()\n"
+        "with r:\n"
+        "    k1 = r.read_key()\n"
+        "    print('KEY1:', repr(k1), flush=True)\n"
+        "    k2 = r.read_key(timeout=0.8)\n"
+        "    print('KEY2:', repr(k2), flush=True)\n"
+        "    k3 = r.read_key(timeout=0.8)\n"
+        "    print('KEY3:', repr(k3), flush=True)\n"
+        "print('KR-DONE', flush=True)\n"
+    ) % src
+
+    pid, fd = pty.fork()
+    if pid == 0:
+        os.environ["TERM"] = "xterm-256color"
+        os.execv(sys.executable, [sys.executable, "-c", child_code])
+
+    buf = b""
+    lines = []
+
+    def drain(wait):
+        nonlocal buf
+        deadline = time.time() + wait
+        while time.time() < deadline:
+            if not sel.select([fd], [], [], 0.05)[0]:
+                return
+            try:
+                chunk = os.read(fd, 4096)
+            except OSError:
+                return
+            if not chunk:
+                return
+            buf += chunk
+            while b"\n" in buf:
+                line, buf = buf.split(b"\n", 1)
+                lines.append(line.decode(errors="replace").strip())
+
+    try:
+        drain(1.5)
+        os.write(fd, b"1")
+        drain(4.0)
+        drain(1.0)
+    finally:
+        try:
+            os.kill(pid, 9)
+            os.waitpid(pid, 0)
+        except Exception:
+            pass
+        os.close(fd)
+
+    status = "OK" if any("KR-DONE" in l for l in lines) else "APPESO"
+    msg = f"PROBE-KR child={status} :: " + " | ".join(lines)
+    print("::error ::" + msg)
+    print(msg)
+    return 0
