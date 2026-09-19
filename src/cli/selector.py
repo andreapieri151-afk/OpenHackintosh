@@ -170,7 +170,19 @@ class KeyReader:
         self._decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
         self._pending: List[str] = []
         self._saved = None
+        self._nonblocking = False
         self._raw_log: List[str] = []
+
+    @property
+    def _poll_mode(self) -> bool:
+        """Su macOS select(2) ha prove di wake-up inaffidabili sui pty.
+
+        Rilevato in CI (macos-latest): dopo la prima lettura, chiamate a
+        select(timeout) sul pty slave talvolta non scadono piu' (neanche a
+        fette da 0.1s). Con fd O_NONBLOCK + polling con sleep il
+        comportamento e' deterministico e identico a prima per il chiamante.
+        """
+        return sys.platform == "darwin"
 
     # -- context manager ---------------------------------------------------
     def __enter__(self) -> "KeyReader":
@@ -180,6 +192,9 @@ class KeyReader:
 
             self._saved = termios.tcgetattr(self.fd)
             tty.setcbreak(self.fd)
+            if self._poll_mode:
+                os.set_blocking(self.fd, False)
+                self._nonblocking = True
         except Exception:  # pragma: no cover - dipende dalla piattaforma
             self._saved = None
         return self
@@ -188,6 +203,13 @@ class KeyReader:
         self.restore()
 
     def restore(self) -> None:
+        if self._nonblocking:
+            try:
+                os.set_blocking(self.fd, True)
+            except Exception:  # pragma: no cover
+                pass
+            finally:
+                self._nonblocking = False
         if self._saved is None:
             return
         try:
@@ -225,10 +247,37 @@ class KeyReader:
             if ready:
                 return True
 
+    def _read_char_poll(self, timeout: Optional[float]) -> Optional[str]:
+        """Variante senza select(): fd non-bloccante + polling con sleep.
+
+        Usata solo su macOS (vedi _poll_mode). Stesso contratto di
+        :meth:`_read_char`: None allo scadere del timeout, attesa
+        indefinita se timeout e' None.
+        """
+        deadline = None if timeout is None else time.monotonic() + timeout
+        while True:
+            try:
+                chunk = os.read(self.fd, 1024)
+            except BlockingIOError:
+                chunk = b""
+            except (OSError, InterruptedError):
+                return None
+            if chunk:
+                text = self._decoder.decode(chunk)
+                if text:
+                    self._pending.extend(list(text))
+                    return self._pending.pop(0)
+                # UTF-8 incompleto: il decoder lo gestisce al prossimo giro.
+            if deadline is not None and time.monotonic() >= deadline:
+                return None
+            time.sleep(0.008)
+
     def _read_char(self, timeout: Optional[float]) -> Optional[str]:
         """Legge un singolo carattere (gestendo UTF-8 multi-byte)."""
         if self._pending:
             return self._pending.pop(0)
+        if self._poll_mode:
+            return self._read_char_poll(timeout)
         while True:
             if timeout is not None and not self._wait(timeout):
                 return None
