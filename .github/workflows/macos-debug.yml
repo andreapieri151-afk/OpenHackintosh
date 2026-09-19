@@ -1,0 +1,33 @@
+name: macos-debug
+
+# WORKFLOW TEMPORANEO di diagnosi pty/macOS. Da eliminare prima del merge.
+
+on:
+  push:
+    branches:
+      - "arena/**"
+
+jobs:
+  bisect:
+    name: macos probe
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: "P0: sonda v2 (fette 0.1s + phantom check)"
+        if: always()
+        run: python tools/pty_probe.py
+
+      - name: "D1bis: casi timeout keys5/keys21"
+        if: always()
+        run: |
+          python -m pytest tests/test_selector.py -q -k "keys5- or keys21-" --tb=line --junitxml=/tmp/d1.xml && rc=0 || rc=$?
+          python tools/junit_annotate.py /tmp/d1.xml || true
+          exit $rc

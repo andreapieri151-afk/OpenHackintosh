@@ -23,22 +23,34 @@ try:
     print("SELECT1:", "READY" if r else "TIMEOUT", flush=True)
     if r:
         print("READ1:", os.read(fd, 16), flush=True)
-    # Seconda attesa: NON arriva piu' input. Su Linux -> TIMEOUT. Su macOS?
-    r, _, _ = select.select([fd], [], [], 0.8)
-    print("SELECT2:", "READY" if r else "TIMEOUT", flush=True)
-    if r:
-        import fcntl
-        flags = fcntl.fcntl(fd, fcntl.F_GETFL)
-        fcntl.fcntl(fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+    # Seconda attesa: NON arriva piu' input. Probe a fette (come il fix):
+    # select da 0.1s ripetuta con deadline. Se una FETTA non ritorna mai,
+    # il fix non basta. Se ritorna READY falso -> phantom ready.
+    import time as _t
+    for i in range(5):
+        t0 = _t.monotonic()
         try:
-            print("READ2(nonblock):", os.read(fd, 16), flush=True)
-        except BlockingIOError:
-            print("READ2(nonblock): WOULD-BLOCK (phantom ready!)", flush=True)
-        finally:
-            fcntl.fcntl(fd, fcntl.F_SETFL, flags)
-    # Terza attesa identica alla prima, per escludere one-shot effects.
-    r, _, _ = select.select([fd], [], [], 0.8)
-    print("SELECT3:", "READY" if r else "TIMEOUT", flush=True)
+            r, _, _ = select.select([fd], [], [], 0.1)
+        except Exception as e:
+            print(f"SLICE{i}: ERROR {e!r}", flush=True)
+            continue
+        dt = _t.monotonic() - t0
+        print(f"SLICE{i}: {'READY' if r else 'TIMEOUT'} in {dt:.3f}s", flush=True)
+        if r:
+            import fcntl
+            flags = fcntl.fcntl(fd, fcntl.F_GETFL)
+            fcntl.fcntl(fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+            try:
+                d = os.read(fd, 16)
+                print(f"SLICE{i}-READ: {d!r}", flush=True)
+            except BlockingIOError:
+                print(f"SLICE{i}-READ: WOULD-BLOCK (phantom ready!)", flush=True)
+            finally:
+                fcntl.fcntl(fd, fcntl.F_SETFL, flags)
+    # Controllo: singola select da 0.08s (come il path ESC che in CI passava).
+    t0 = _t.monotonic()
+    r, _, _ = select.select([fd], [], [], 0.08)
+    print(f"CTRL-0.08: {'READY' if r else 'TIMEOUT'} in {_t.monotonic()-t0:.3f}s", flush=True)
 finally:
     termios.tcsetattr(fd, termios.TCSADRAIN, old)
 print("CHILD-DONE", flush=True)
