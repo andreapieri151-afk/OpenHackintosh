@@ -428,7 +428,7 @@ sys.stdout.flush()
 """
 
 
-def _run_in_pty(keys, count=10, timeout=10.0, key_delay=0.2):
+def _run_in_pty(keys, count=10, timeout=15.0, key_delay=0.2):
     import select as _select
     import pty as _pty
 
@@ -439,33 +439,38 @@ def _run_in_pty(keys, count=10, timeout=10.0, key_delay=0.2):
         os.environ["TERM"] = "xterm-256color"
         os.execv(sys.executable, [sys.executable, "-c", code, str(count)])
 
+    def _drain(max_wait):
+        nonlocal buf
+        deadline = time.time() + max_wait
+        while time.time() < deadline:
+            if not _select.select([fd], [], [], 0.05)[0]:
+                return
+            try:
+                chunk = os.read(fd, 4096)
+            except OSError:
+                return
+            if not chunk:
+                return
+            buf += chunk
+
     buf = b""
     try:
-        time.sleep(0.8)
+        # Attende che il figlio ABBIA DISEGNATO il menu (runner CI lenti,
+        # specialmente macOS): inviare i tasti prima rischia di perderli o di
+        # farli leggere come input di una riga. Timeout generoso come fallback.
+        ready_deadline = time.time() + 8.0
+        while time.time() < ready_deadline and b"Opt1" not in buf:
+            _drain(0.05)
         for key in keys:
             if isinstance(key, float):
                 time.sleep(key)
                 continue
             os.write(fd, key)
             time.sleep(key_delay)
-            while _select.select([fd], [], [], 0.02)[0]:
-                try:
-                    chunk = os.read(fd, 65536)
-                except OSError:
-                    break
-                if not chunk:
-                    break
-                buf += chunk
+            _drain(0.02)
         deadline = time.time() + timeout
         while time.time() < deadline and b"RESULT=" not in buf:
-            if _select.select([fd], [], [], 0.2)[0]:
-                try:
-                    chunk = os.read(fd, 65536)
-                except OSError:
-                    break
-                if not chunk:
-                    break
-                buf += chunk
+            _drain(0.2)
     finally:
         try:
             os.kill(pid, 9)
