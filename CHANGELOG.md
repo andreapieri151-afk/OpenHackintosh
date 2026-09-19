@@ -1,5 +1,49 @@
 # Changelog - Tutte le bestemmie in ordine cronologico
 
+## 2.0.1 Stable - 2026-09-19 — WINDOWS + LINUX, FINE DELLA BETA
+
+La **2.0.1 diventa Stable**: il tool ora gira nativamente su **Windows, Linux
+e macOS**, con il rilevamento hardware completo anche su Windows. Stessa
+filosofia: niente file finti, niente dati inventati.
+
+### Aggiunto — supporto Windows
+
+- `src/hardware/windows.py`: provider di detection via **PowerShell CIM**
+  (`Get-CimInstance`, mai il deprecato `wmic`): DMI/scheda madre/BIOS, CPU,
+  dispositivi PnP PCI/USB con VEN/DEV, GPU, audio, Ethernet, Wi-Fi, Bluetooth,
+  controller storage e dischi, interfacce di rete, UEFI/Legacy
+  (PEFirmwareType). Una sola invocazione batched con output JSON; parsing puro
+  e testabile su qualsiasi OS. ACPI tables restano onestamente
+  `NOT_AVAILABLE_ON_PLATFORM` su Windows.
+- `src/cli/selector.py` — `WindowsKeyReader` (`msvcrt`): frecce, Home/End,
+  PgUp/PgDn, Canc, ESC, Ctrl+C e numeri multi-cifra funzionano anche nella
+  console Windows; `make_key_reader()` sceglie il lettore giusto in automatico.
+- `OpenHackintosh.bat`: launcher Windows (venv automatico, dipendenze,
+  `chcp 65001`, esecuzione con un doppio click).
+- `src/utils/platforms.py`: `current_platform()` e cache cross-platform
+  (`%LOCALAPPDATA%\OpenHackintosh\Cache` su Windows; `~/.cache` su Unix).
+- `src/utils/console.py`: bootstrap console — UTF-8 con `errors="replace"`
+  (mai più `UnicodeEncodeError` su cp1252) e attivazione VT mode ANSI su
+  Windows 10+; logica colori unificata per tutta la CLI.
+- Ci GitHub Actions: suite pytest su matrix Windows/Linux/macOS.
+- `src/version.py`: unica fonte di verità per il numero di versione.
+
+### Corretto
+
+- Cache download su Windows: prima finiva in `./.cache` nella cartella
+  corrente (`HOME` non esiste su Windows) — ora in `%LOCALAPPDATA%`.
+- `README`/`README_EFI.txt` generati con encoding esplicito UTF-8
+  (crash su Windows con caratteri non-cp1252).
+- Nomi dei file generati guidati dal profilo: `EFI_<PROFILO>.zip` e
+  `README_EFI.txt` — prima un EFI per Q957 usciva come `EFI_Q5562.zip`.
+- `doctor`: controllo scrittura sulla temp dir reale della piattaforma
+  (non più `/tmp` fisso).
+
+### Invariato
+
+- Struttura CLI (9 comandi + `ask`), database profili, matcher, compatibilità
+  deterministica, EFI hardening/audit. Test: da 177 a 263.
+
 ## 2.0.1 Beta 1 — HOTFIX SELETTORE CLI - 2026-09-01
 
 > Stessa versione **2.0.1 Beta 1**, ricostruita con il selettore corretto.

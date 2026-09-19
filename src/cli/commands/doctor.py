@@ -36,9 +36,13 @@ def run_doctor(args, out: Out) -> dict:
     has_net = bool(shutil.which("curl") or shutil.which("wget"))
     add("Network tools", has_net, "curl/wget per download")
 
-    # Permessi scrittura
-    tmpdir = Path("/tmp")
-    add("Temporary write", tmpdir.exists() or Path(".").exists(), "necessario per EFI build")
+    # Permessi scrittura (temp dir reale della piattaforma, non "/tmp" fisso:
+    # su Windows quel percorso non esiste).
+    import tempfile
+
+    tmpdir = Path(tempfile.gettempdir())
+    add("Temporary write", tmpdir.exists() or Path(".").exists(),
+        f"{tmpdir} - necessario per EFI build")
 
     if out.json_output:
         payload = {

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# OpenHackintosh 2.0.1 Beta 1 — launcher CLI (Linux/macOS)
+# OpenHackintosh 2.0.1 Stable — launcher CLI (Linux/macOS)
 # Non usa path assoluti: lavora nella directory del progetto.
 
 cd "$(dirname "$0")" || exit 1

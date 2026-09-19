@@ -20,6 +20,14 @@ class BuildError(RuntimeError):
     """Errore bloccante: un componente obbligatorio non e' disponibile."""
 
 
+def _profile_slug(profile_name: str) -> str:
+    """Slug sicuro per nomi file: 'fujitsu_q556_2' -> 'FUJITSU_Q556_2', 'Q556/2' -> 'Q556_2'."""
+    import re
+
+    slug = re.sub(r"[^A-Za-z0-9]+", "_", str(profile_name)).strip("_").upper()
+    return slug or "UNKNOWN"
+
+
 class EFIBuilder:
     def __init__(self, output_dir: Path, progress_callback: Optional[Callable] = None):
         self.output_dir = Path(output_dir)
@@ -27,7 +35,9 @@ class EFIBuilder:
         self.progress_callback = progress_callback
         self.downloader = EFIDownloader(self.output_dir / "downloads", progress_callback)
         self.efi_root = self.output_dir / "EFI"
-        
+        # Profilo corrente, usato per i nomi dei file generati (zip/README).
+        self._profile_slug = "UNKNOWN"
+
         self.logs = []
     
     def log(self, msg: str):
@@ -161,7 +171,9 @@ class EFIBuilder:
             f"https://github.com/dortania/Getting-Started-With-ACPI/raw/master/extra-files/compiled/{name}.aml",
         ]
 
-        import requests
+        from .downloader import _requests
+
+        requests = _requests()
 
         missing: List[str] = []
         for ssdt_name in names:
@@ -291,14 +303,16 @@ Generata il: {__import__('datetime').datetime.now().isoformat()}
 Tool: https://github.com/andreapieri151-afk/OpenHackintosh
 Fatta con ❤️ e bestemmie davanti a un Q556/2 che non bootava
 """
-        (self.output_dir / "README.md").write_text(readme_content)
-        (self.efi_root / "OC" / "README_Q5562.txt").write_text(readme_content)
+        # encoding esplicito: su Windows il default cp1252 non puo' scrivere
+        # emoji/UTF-8 e farebbe fallire la build con UnicodeEncodeError.
+        (self.output_dir / "README.md").write_text(readme_content, encoding="utf-8")
+        (self.efi_root / "OC" / "README_EFI.txt").write_text(readme_content, encoding="utf-8")
         self.log("✓ README created")
-    
+
     def create_zip(self) -> Path:
         """Create ZIP of EFI"""
         self.log("📦 Creo ZIP pronto per chiavetta...")
-        zip_path = self.output_dir / "EFI_Q5562.zip"
+        zip_path = self.output_dir / f"EFI_{self._profile_slug}.zip"
         
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as z:
             for file_path in self.efi_root.rglob("*"):
@@ -327,6 +341,7 @@ Fatta con ❤️ e bestemmie davanti a un Q556/2 che non bootava
         device_properties: Optional[Dict] = None
     ) -> Dict:
         """Full build process, hardware-aware e strict."""
+        self._profile_slug = _profile_slug(profile_name)
         self.log(f"=== 🚀 Creo EFI per {profile_name} ===")
         self.log(f"Obiettivo: {macos_version} / {smbios_model} / audio layout {audio_layout}")
         self.log(f"Modalità: {'DEV' if dev else 'RELEASE'}")

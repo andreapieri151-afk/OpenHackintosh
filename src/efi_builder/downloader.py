@@ -8,11 +8,27 @@ import json
 import zipfile
 import shutil
 import tempfile
-import requests
 from pathlib import Path
 from typing import Callable, Optional, Dict
 
 from efi.integrity import validate_efi_binary, validate_kext
+
+
+def _requests():
+    """Import pigro di requests.
+
+    Cosi' i comandi che non scaricano nulla (version, menu, detect, database,
+    validate, doctor...) funzionano anche senza dipendenze installate.
+    Solo generate/download richiede davvero requests.
+    """
+    try:
+        import requests
+    except ImportError as exc:  # pragma: no cover - dipende dall'ambiente
+        raise RuntimeError(
+            "Il modulo 'requests' non e' installato: pip install requests "
+            "(oppure lancia il tool tramite il launcher, che lo installa da solo)."
+        ) from exc
+    return requests
 
 GITHUB_API = "https://api.github.com/repos/{repo}/releases/latest"
 HEADERS = {"Accept": "application/vnd.github.v3+json", "User-Agent": "Q5562-EFI-Tool/1.0"}
@@ -27,6 +43,7 @@ class DownloadProgress:
 
 def get_latest_release(repo: str) -> Optional[Dict]:
     """Get latest release info from GitHub"""
+    requests = _requests()
     url = GITHUB_API.format(repo=repo)
     try:
         r = requests.get(url, headers=HEADERS, timeout=15)
@@ -62,6 +79,7 @@ def find_asset(release: Dict, keywords: list) -> Optional[Dict]:
 
 def download_file(url: str, dest: Path, progress: Optional[DownloadProgress] = None, name: str = "file") -> bool:
     """Download file with progress"""
+    requests = _requests()
     for verify in [True, False]:  # Try with and without SSL verify
         try:
             with requests.get(url, stream=True, timeout=60, headers=HEADERS, verify=verify) as r:
@@ -188,8 +206,11 @@ class EFIDownloader:
         self.progress = DownloadProgress(progress_callback)
         self.temp_dir = self.work_dir / "temp"
         self.temp_dir.mkdir(exist_ok=True)
-        home = Path(os.environ.get("HOME", "."))
-        self.cache_dir = Path(os.environ.get("OPENHACKINTOSH_CACHE", home / ".cache" / "openhackintosh"))
+        # Cache cross-platform: su Windows HOME non esiste (e "./.cache" nella
+        # cwd inquinerebbe il progetto). Vedi utils.platforms.default_cache_dir.
+        from utils.platforms import default_cache_dir
+
+        self.cache_dir = default_cache_dir()
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
     def _cached_zip(self, name: str) -> Optional[Path]:

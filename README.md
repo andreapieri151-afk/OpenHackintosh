@@ -14,7 +14,7 @@ Così l'ho riscritto da zero, ma **per bene**. Con file veri scaricati da GitHub
 
 **Ora supporta Q556/2 e Q957, e nei prossimi giorni aggiungerò altri dispositivi** - mini PC, laptop, desktop Skylake/Kaby Lake/Coffee Lake. Se hai un PC e vuoi che lo supporti, apri una issue con il modello e lo aggiungo.
 
-> ⚠️ **Questa è una BETA.** La versione distribuita è **OpenHackintosh 2.0.1 Beta 1**: è un checkpoint stabile usato per iniziare a distribuire il progetto, ma il supporto hardware è ancora **sperimentale**. Non aspettarti che ogni PC booti al primo colpo; testa su hardware reale e apri issue con i log.
+> ℹ️ **Versione attuale: OpenHackintosh 2.0.1 Stable** — gira su **Windows, Linux e macOS**, con rilevamento hardware completo su Windows e Linux. Il supporto ai singoli modelli di PC resta però da verificare sul campo: non aspettarti che ogni PC booti al primo colpo; testa e apri issue con i log.
 
 ---
 
@@ -86,20 +86,32 @@ Un po' come OpCore-Simplify ma più semplice, più umano, con CLI chiara e con f
 
 ## Come si usa? (da terminale)
 
-OpenHackintosh **2.0.1 Beta 1** è **solo terminale**: ho tolto GUI e Web Dashboard per mantenere il tool semplice, testabile e senza dipendenze inutili.
+OpenHackintosh **2.0.1 Stable** è **solo terminale**: ho tolto GUI e Web Dashboard per mantenere il tool semplice, testabile e senza dipendenze inutili.
 
-### 1. macOS — doppio click (il più facile)
+### Cosa funziona su quale sistema
 
-1. **Download** dello ZIP della release (`OpenHackintosh-2.0.1-Beta-1-fixed.zip`, in `releases/`)
+| Piattaforma | Avvio | Hardware detection | Generazione EFI |
+|---|---|---|---|
+| **Windows 10/11** | `OpenHackintosh.bat` | ✅ Completa (PowerShell CIM) | ✅ |
+| **Linux** | `./openhackintosh` | ✅ Completa (sysfs/lspci) | ✅ |
+| **macOS** | `OpenHackintosh.command` | ⚠️ Best-effort (il Mac serve soprattutto a *generare* l'EFI; per analizzare un PC lancia il tool su quel PC) | ✅ |
+
+Requisiti: **Python 3.9+** e connessione a Internet (i componenti EFI si scaricano da GitHub). Su Windows serve PowerShell 5.1+ (già incluso in Windows 10/11) per il rilevamento hardware.
+
+### 1. Windows — doppio click
+
+1. **Download** dello ZIP della release (`OpenHackintosh-2.0.1.zip`, in `releases/`)
+2. **Extract**
+3. **Doppio click su `OpenHackintosh.bat`** (o, dal Prompt dei comandi nella cartella, `OpenHackintosh.bat`)
+
+Il launcher crea da solo l'ambiente Python (`.venv`), installa le dipendenze e apre il menu. Le frecce, i numeri (anche multi-cifra) e le combinazioni standard funzionano come su Linux/macOS.
+
+### 2. macOS — doppio click
+
+1. **Download** dello ZIP della release
 2. **Extract**
 3. **Doppio click su `OpenHackintosh.command`**
 4. Si apre il Terminale e parte automaticamente OpenHackintosh
-
-> ℹ️ In `releases/` trovi due ZIP della **stessa versione 2.0.1 Beta 1**:
-> `OpenHackintosh-2.0.1-Beta-1.zip` è la build originale,
-> `OpenHackintosh-2.0.1-Beta-1-fixed.zip` è la stessa build con il selettore
-> del menu CLI corretto — **usa quest'ultima**.
-> Dettagli: [`docs/HOTFIX-2.0.1-Beta-1-SELECTOR.md`](docs/HOTFIX-2.0.1-Beta-1-SELECTOR.md).
 
 Se macOS non lo esegue (o il file `.command` ha perso il bit eseguibile), apri Terminale nella cartella e lancia:
 
@@ -114,7 +126,7 @@ oppure, senza necessità di eseguibilità:
 bash OpenHackintosh.command
 ```
 
-### 2. Linux / macOS — terminale
+### 3. Linux / macOS — terminale
 
 ```bash
 cd cartella_estratta
