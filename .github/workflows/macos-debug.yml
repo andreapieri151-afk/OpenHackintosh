@@ -24,7 +24,11 @@ jobs:
 
       - name: "D1: cifre + multi-cifra"
         if: always()
-        run: python -m pytest tests/test_selector.py -q -k "keys0- or keys1- or keys2- or keys3- or keys4- or keys5- or keys6- or keys19- or keys20- or keys21-"
+        run: |
+          python -m pytest tests/test_selector.py -q -k "keys0- or keys1- or keys2- or keys3- or keys4- or keys5- or keys6- or keys19- or keys20- or keys21-" --junitxml=/tmp/d1.xml
+          rc=$?
+          python tools/junit_annotate.py /tmp/d1.xml
+          exit $rc
 
       - name: "D2: frecce CSI/SS3 + ESC/q"
         if: always()
