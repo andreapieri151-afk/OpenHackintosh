@@ -201,11 +201,29 @@ class KeyReader:
 
     # -- lettura -----------------------------------------------------------
     def _wait(self, timeout: Optional[float]) -> bool:
-        try:
-            ready, _, _ = _select.select([self.fd], [], [], timeout)
-        except Exception:  # pragma: no cover - fd non selezionabile
-            return True
-        return bool(ready)
+        """Attende dati sul fd. Ritorna False solo allo SCADERE del timeout.
+
+        Implementazione a fette (0.1s) con controllo di deadline: su macOS
+        ``select(timeout)`` su un pty slave puo' NON risvegliarsi mai dopo
+        aver gia' letto dati (rilevato in CI su runner macos-latest: attese
+        da 0.8s bloccate per minuti mentre quelle da 0.08s scadevano).
+        Fette corte + deadline rendono il comportamento identico ovunque.
+        """
+        deadline = None if timeout is None else time.monotonic() + timeout
+        while True:
+            if deadline is not None:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    return False
+                slice_t = min(0.1, remaining)
+            else:
+                slice_t = 0.1
+            try:
+                ready, _, _ = _select.select([self.fd], [], [], slice_t)
+            except Exception:  # pragma: no cover - fd non selezionabile
+                return True
+            if ready:
+                return True
 
     def _read_char(self, timeout: Optional[float]) -> Optional[str]:
         """Legge un singolo carattere (gestendo UTF-8 multi-byte)."""

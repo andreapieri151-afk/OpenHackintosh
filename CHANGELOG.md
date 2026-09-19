@@ -38,6 +38,10 @@ filosofia: niente file finti, niente dati inventati.
   `README_EFI.txt` — prima un EFI per Q957 usciva come `EFI_Q5562.zip`.
 - `doctor`: controllo scrittura sulla temp dir reale della piattaforma
   (non più `/tmp` fisso).
+- `KeyReader._wait`: attese a fette da 0.1s con deadline esplicita —
+  workaround per il wake-up mancato di `select()` su pty slave macOS
+  (in CI, su macos-latest, le attese >= 1 tick non scadevano piu' dopo la
+  prima lettura, bloccando il menu quando si attendeva una seconda cifra).
 
 ### Invariato
 

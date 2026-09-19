@@ -2,6 +2,12 @@
 
 Utility scripts for Q556/2 Hackintosh.
 
+## Script del repository
+
+- `build_release.py` — costruisce lo ZIP di distribuzione (`releases/`), deterministico.
+- `junit_annotate.py` — legge un report JUnit XML di pytest ed emette i fallimenti come annotazioni GitHub (utile quando i log CI non sono scaricabili).
+- `pty_probe.py` — sonda diagnostica per select/pty su macOS (usata per individuare il wake-up mancato di `select()` su pty slave Darwin; esce sempre 0).
+
 ## GenSMBIOS
 
 Use CorpNewt's GenSMBIOS for proper serial generation:
