@@ -1,0 +1,44 @@
+name: macos-debug
+
+# WORKFLOW TEMPORANEO di bisezione: capire quale subset fallisce su macOS.
+# Da eliminare prima del merge.
+
+on:
+  push:
+    branches:
+      - "arena/**"
+
+jobs:
+  bisect:
+    name: macos bisect
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: "subset A: test_selector (pty)"
+        if: always()
+        run: python -m pytest tests/test_selector.py -q
+
+      - name: "subset B: nuovi test windows/piattaforma"
+        if: always()
+        run: python -m pytest tests/test_windows_provider.py tests/test_windows_keys.py tests/test_platform.py -q
+
+      - name: "subset C: tutto il resto"
+        if: always()
+        run: >-
+          python -m pytest tests/ -q
+          --ignore=tests/test_selector.py
+          --ignore=tests/test_windows_provider.py
+          --ignore=tests/test_windows_keys.py
+          --ignore=tests/test_platform.py
+
+      - name: "smoke: --version"
+        if: always()
+        run: python main.py --version
