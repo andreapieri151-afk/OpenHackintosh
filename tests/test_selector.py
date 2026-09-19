@@ -529,7 +529,16 @@ pytestmark_pty = pytest.mark.skipif(
 )
 def test_pty_end_to_end(keys, expected, count):
     got, text = _run_in_pty(keys, count=count)
-    assert got == expected, f"atteso {expected!r}, ottenuto {got!r}\n---\n{text[-1500:]}"
+    # Diagnostica compatta: leggibile anche via annotazioni CI (log tagliati).
+    diag = (
+        f"len={len(text)} "
+        f"numero_digitato={'Numero:' in text} "
+        f"menu_disegni={text.count('Opt1')} "
+        f"result_in_output={'RESULT=' in text}"
+    )
+    assert got == expected, (
+        f"atteso {expected!r}, ottenuto {got!r} | {diag} | tail={text[-300:]!r}"
+    )
 
 
 @pytestmark_pty

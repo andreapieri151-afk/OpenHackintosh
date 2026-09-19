@@ -22,10 +22,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
-      - name: "D1: cifre + multi-cifra"
+      - name: "D1bis: solo casi timeout (keys5/keys21) diag compatta"
         if: always()
         run: |
-          python -m pytest tests/test_selector.py -q -k "keys0- or keys1- or keys2- or keys3- or keys4- or keys5- or keys6- or keys19- or keys20- or keys21-" --junitxml=/tmp/d1.xml && rc=0 || rc=$?
+          python -m pytest tests/test_selector.py -q -k "keys5- or keys21-" --tb=line --junitxml=/tmp/d1.xml && rc=0 || rc=$?
           python tools/junit_annotate.py /tmp/d1.xml || true
           exit $rc
 
