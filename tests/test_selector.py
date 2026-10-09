@@ -441,7 +441,20 @@ def _run_in_pty(keys, count=10, timeout=10.0, key_delay=0.2):
 
     buf = b""
     try:
-        time.sleep(0.8)
+        # Aspetta che il menu sia disegnato PRIMA di inviare tasti. Uno sleep
+        # fisso era una race: su runner lenti (es. macOS CI) i tasti arrivavano
+        # prima che il figlio entrasse in modalita' di lettura e andavano persi.
+        ready_deadline = time.time() + timeout
+        while time.time() < ready_deadline and b"Opt1" not in buf:
+            if _select.select([fd], [], [], 0.2)[0]:
+                try:
+                    chunk = os.read(fd, 65536)
+                except OSError:
+                    break
+                if not chunk:
+                    break
+                buf += chunk
+
         for key in keys:
             if isinstance(key, float):
                 time.sleep(key)
