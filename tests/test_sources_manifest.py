@@ -214,6 +214,22 @@ def test_min_size_must_be_int():
     assert any("min_size" in e for e in errors)
 
 
+def test_debug_asset_pattern_rejected():
+    """Regola 2.0.2: mai build DEBUG nel manifest, solo RELEASE ufficiali."""
+    raw = valid_manifest_dict()
+    raw["components"][0]["source"]["asset"] = "OpenCore-*-DEBUG.zip"
+    _, errors = validate_manifest_dict(raw)
+    assert any("DEBUG" in e for e in errors)
+
+
+def test_release_asset_pattern_allowed():
+    raw = valid_manifest_dict()
+    raw["components"][0]["source"]["asset"] = "OpenCore-*-RELEASE.zip"
+    manifest, errors = validate_manifest_dict(raw)
+    assert errors == []
+    assert manifest is not None
+
+
 # ---------------------------------------------------------------------------
 # Loader + manifest reale del Q556/2
 # ---------------------------------------------------------------------------
@@ -332,3 +348,42 @@ def test_pick_asset_empty_pattern_first_zip():
 
 def test_pick_asset_empty_list():
     assert pick_asset([], "*.zip") is None
+
+
+# ---------------------------------------------------------------------------
+# Template nei pattern asset ({macos})
+# ---------------------------------------------------------------------------
+
+def test_resolve_asset_pattern_plain():
+    from sources.fetcher import resolve_asset_pattern
+
+    assert resolve_asset_pattern("X-*-RELEASE.zip", None) == "X-*-RELEASE.zip"
+    assert resolve_asset_pattern("X-*-RELEASE.zip", {"macos": "Ventura"}) == "X-*-RELEASE.zip"
+
+
+def test_resolve_asset_pattern_template():
+    from sources.fetcher import resolve_asset_pattern
+
+    pattern = "AirportItlwm_*_stable_{macos}.kext.zip"
+    assert resolve_asset_pattern(pattern, {"macos": "Ventura"}) == \
+        "AirportItlwm_*_stable_Ventura.kext.zip"
+
+
+def test_resolve_asset_pattern_missing_context():
+    from sources.fetcher import FetchError, resolve_asset_pattern
+
+    with pytest.raises(FetchError):
+        resolve_asset_pattern("X_{macos}.zip", None)
+    with pytest.raises(FetchError):
+        resolve_asset_pattern("X_{macos}.zip", {})
+
+
+def test_macos_asset_variant_mapping():
+    from sources.pipeline import macos_asset_variant
+
+    assert macos_asset_variant("Ventura 13.x") == "Ventura"
+    assert macos_asset_variant("Monterey 12.x") == "Monterey"
+    assert macos_asset_variant("Sonoma 14.x") == "Sonoma14.4"
+    assert macos_asset_variant("Big Sur 11.x") == "BigSur"
+    assert macos_asset_variant("Sequoia 15.x") is None
+    assert macos_asset_variant("Windows") is None

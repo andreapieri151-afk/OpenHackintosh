@@ -49,6 +49,30 @@ FLAG_TO_GROUP = {
 }
 
 
+#: Mappa nome macOS -> variante usata negli asset che dipendono dalla versione
+#: di macOS (es. AirportItlwm ha un kext diverso per ogni macOS).
+MACOS_ASSET_VARIANTS = {
+    "High Sierra": "HighSierra",
+    "Mojave": "Mojave",
+    "Catalina": "Catalina",
+    "Big Sur": "BigSur",
+    "Monterey": "Monterey",
+    "Ventura": "Ventura",
+    "Sonoma": "Sonoma14.4",
+    # Sequoia: nessuna variante dichiarata -> i componenti con {macos} falliscono
+    # in modo esplicito invece di scaricare un kext per un altro macOS.
+    "Sequoia": None,
+}
+
+
+def macos_asset_variant(macos_version: str) -> Optional[str]:
+    """Variante {macos} per il target richiesto, o None se non mappata."""
+    for name, variant in MACOS_ASSET_VARIANTS.items():
+        if str(macos_version).startswith(name):
+            return variant
+    return None
+
+
 def _profile_slug(profile_name: str) -> str:
     import re
 
@@ -164,6 +188,14 @@ def run_manifest_pipeline(
     _create_structure(efi_root)
     say(f"=== Sources engine v1: creo EFI per {profile.id} ===")
 
+    # Contesto per i template dei pattern asset ({macos}). Se il macOS target
+    # non ha una variante dichiarata, il contesto resta senza chiave e i
+    # componenti che la usano falliscono con un errore esplicito.
+    fetch_context: Dict[str, str] = {}
+    variant = macos_asset_variant(macos_version)
+    if variant:
+        fetch_context["macos"] = variant
+
     flags = dict(
         include_wifi=include_wifi,
         include_bluetooth=include_bluetooth,
@@ -185,7 +217,7 @@ def run_manifest_pipeline(
             ))
             continue
         say(f"  -> {comp.id} ({comp.target})")
-        result = materialize_component(comp, fetcher, out, efi_root)
+        result = materialize_component(comp, fetcher, out, efi_root, fetch_context)
         if result.status == OK:
             say(f"     OK  [{result.size} bytes, sha256 {result.sha256[:12]}…]" if result.sha256 else "     OK")
         elif comp.required:

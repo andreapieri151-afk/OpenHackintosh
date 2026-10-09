@@ -23,7 +23,14 @@ from .loader import (
     load_manifest_for_profile,
     manifest_path_for,
 )
-from .fetcher import FetchError, GitHubFetcher, InMemoryFetcher, pick_asset, source_cache_name
+from .fetcher import (
+    FetchError,
+    GitHubFetcher,
+    InMemoryFetcher,
+    pick_asset,
+    resolve_asset_pattern,
+    source_cache_name,
+)
 from .resolver import (
     FAILED,
     GENERATED,
@@ -50,6 +57,7 @@ __all__ = [
     "GitHubFetcher",
     "InMemoryFetcher",
     "pick_asset",
+    "resolve_asset_pattern",
     "source_cache_name",
     "FAILED",
     "GENERATED",

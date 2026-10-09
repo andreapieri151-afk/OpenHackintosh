@@ -104,7 +104,7 @@ def _extract_kext_bundle(zf: zipfile.ZipFile, bundle_name: str, dest_dir: Path) 
 
 
 def materialize_component(component: ComponentSpec, fetcher, output_dir: Path,
-                          efi_root: Path) -> MaterializedComponent:
+                          efi_root: Path, context: Optional[dict] = None) -> MaterializedComponent:
     """Materializza UN componente. Non lancia eccezioni: lo stato sta nell'esito."""
     result = MaterializedComponent(
         component_id=component.id,
@@ -125,7 +125,7 @@ def materialize_component(component: ComponentSpec, fetcher, output_dir: Path,
 
     try:
         if component.kind in ("efi_binary", "kext"):
-            archive_path = fetcher.fetch_archive(component.source)
+            archive_path = fetcher.fetch_archive(component.source, context)
             result.source_url = component.source.summary()
             with zipfile.ZipFile(archive_path) as zf:
                 if component.kind == "efi_binary":
@@ -145,7 +145,7 @@ def materialize_component(component: ComponentSpec, fetcher, output_dir: Path,
                         return result
 
         elif component.kind == "aml":
-            data, url = fetcher.fetch_bytes(component.source)
+            data, url = fetcher.fetch_bytes(component.source, context)
             result.source_url = url
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_bytes(data)

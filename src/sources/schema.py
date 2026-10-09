@@ -175,6 +175,11 @@ def _validate_source(raw: Any, ctx: str) -> tuple:
     if stype == "github_release":
         if not spec.repo or "/" not in spec.repo:
             errors.append(f"{ctx}.source: repo GitHub mancante/invalido: {spec.repo!r}")
+        if "debug" in spec.asset.lower():
+            errors.append(
+                f"{ctx}.source: gli asset DEBUG sono vietati nel manifest "
+                f"(solo RELEASE ufficiali): {spec.asset!r}"
+            )
     elif stype == "github_raw":
         if not spec.repo or "/" not in spec.repo:
             errors.append(f"{ctx}.source: repo GitHub mancante/invalido: {spec.repo!r}")

@@ -603,6 +603,128 @@ def test_github_fetcher_release_not_found(tmp_path, monkeypatch):
         fetcher.fetch_archive(src)
 
 
+def test_github_fetcher_rejects_debug_assets(tmp_path, monkeypatch):
+    """Regola 2.0.2: se la selezione capita su un asset DEBUG -> rifiuto netto."""
+    from sources.fetcher import FetchError, GitHubFetcher
+
+    fetcher = GitHubFetcher(tmp_path / "work", cache_dir=tmp_path / "cache",
+                            log=lambda m: None)
+    # Pattern generico che potrebbe matchare anche il DEBUG: il fetcher deve
+    # comunque rifiutarlo.
+    monkeypatch.setattr(fetcher, "_get_release",
+                        lambda repo, tag: {"assets": [
+                            {"name": "Lilu-1.7.2-DEBUG.zip",
+                             "browser_download_url": "https://example.invalid/x"}]})
+    src = SourceSpec(type="github_release", repo="acidanthera/Lilu",
+                     asset="Lilu-*.zip")
+    with pytest.raises(FetchError) as exc:
+        fetcher.fetch_archive(src)
+    assert "DEBUG" in str(exc.value)
+
+
+def test_github_fetcher_template_selects_macos_asset(tmp_path, monkeypatch):
+    """{macos} nel pattern: deve selezionare l'asset del macOS target."""
+    from sources.fetcher import GitHubFetcher
+    from efi_builder import downloader
+
+    fetcher = GitHubFetcher(tmp_path / "work", cache_dir=tmp_path / "cache",
+                            log=lambda m: None)
+    monkeypatch.setattr(fetcher, "_get_release", lambda repo, tag: {"assets": [
+        {"name": "AirportItlwm_v2.3.0_stable_BigSur.kext.zip", "browser_download_url": "u1"},
+        {"name": "AirportItlwm_v2.3.0_stable_Ventura.kext.zip", "browser_download_url": "u2"},
+        {"name": "AirportItlwm_v2.3.0_stable_Sonoma14.4.kext.zip", "browser_download_url": "u3"},
+    ]})
+
+    downloaded = []
+
+    def fake_download(url, dest, progress=None, name="file"):
+        downloaded.append(url)
+        from pathlib import Path
+        Path(dest).write_bytes(make_kext_zip("p", "AirportItlwm.kext"))
+        return True
+
+    monkeypatch.setattr(downloader, "download_file", fake_download)
+
+    src = SourceSpec(type="github_release", repo="OpenIntelWireless/itlwm",
+                     tag="v2.3.0",
+                     asset="AirportItlwm_*_stable_{macos}.kext.zip")
+    path = fetcher.fetch_archive(src, context={"macos": "Ventura"})
+    assert path.name == "AirportItlwm_v2.3.0_stable_Ventura.kext.zip"
+    assert downloaded == ["u2"]
+
+
+def test_pipeline_passes_macos_context(tmp_path):
+    """La pipeline passa {macos} risolto ai fetcher durante la materializzazione."""
+    from sources.pipeline import run_manifest_pipeline
+
+    class ContextSpy(InMemoryFetcher):
+        def __init__(self):
+            super().__init__()
+            self.contexts = []
+
+        def fetch_archive(self, source, context=None):
+            self.contexts.append(context)
+            return super().fetch_archive(source, context)
+
+        def fetch_bytes(self, source, context=None):
+            self.contexts.append(context)
+            return super().fetch_bytes(source, context)
+
+    manifest = build_manifest()
+    fetcher = ContextSpy()
+    fetcher = build_fetcher(manifest, fetcher=fetcher)
+    out = tmp_path / "ctx"
+    result = run_manifest_pipeline(
+        manifest=manifest, profile=profile(), output_dir=out,
+        fetcher=fetcher, macos_version="Ventura 13.x", log=lambda m: None,
+    )
+    assert result["success"] is True
+    assert fetcher.contexts, "il fetcher non ha ricevuto contesto"
+    assert all(ctx == {"macos": "Ventura"} for ctx in fetcher.contexts)
+
+
+def test_pipeline_sequoia_context_has_no_macos_key(tmp_path):
+    """Sequoia non ha variante {macos}: il contesto non contiene la chiave e i
+    componenti che la richiedono falliscono in modo esplicito (qui opzionale)."""
+    manifest = build_manifest()
+    # aggiunge un opzionale wifi con template {macos}
+    raw = build_manifest_dict()
+    raw["components"].append({
+        "id": "wifi_test", "kind": "kext", "required": False,
+        "optional_group": "wifi", "target": "OC/Kexts/AirportItlwm.kext",
+        "source": _gh_release("test/itlwm", "AirportItlwm_*_{macos}.zip"),
+    })
+    manifest, errors = validate_manifest_dict(raw)
+    assert errors == []
+
+    fetcher = InMemoryFetcher()
+    for comp in manifest.components:
+        src = comp.source
+        if comp.kind in ("efi_binary", "kext"):
+            if src.repo == OC_REPO:
+                fetcher.register_archive(src, OC_ZIP)
+            elif comp.id != "wifi_test":
+                bundle = comp.target.split("/")[-1]
+                fetcher.register_archive(src, make_kext_zip(f"{bundle}-1.0-RELEASE", bundle))
+        elif comp.kind == "aml":
+            fetcher.register_bytes(src, make_aml())
+    # Registra l'archivio wifi (ci sarebbe pure, ma il pattern non si puo' risolvere)
+    fetcher.register_archive(manifest.by_id()["wifi_test"].source,
+                             make_kext_zip("w", "AirportItlwm.kext"))
+
+    out = tmp_path / "seq"
+    result = run_manifest_pipeline(
+        manifest=manifest, profile=profile(), output_dir=out,
+        fetcher=fetcher, macos_version="Sequoia 15.x", include_wifi=True,
+        log=lambda m: None,
+    )
+    # Opzionale che fallisce -> SKIPPED, la build resta VALID
+    assert result["success"] is True
+    ids = {c["component_id"]: c for c in result["components"]}
+    assert ids["wifi_test"]["status"] == "SKIPPED"
+    assert "contesto" in ids["wifi_test"]["reason"]
+
+
 def test_github_fetcher_corrupt_zip_invalidates_cache(tmp_path, monkeypatch):
     from sources.fetcher import FetchError, GitHubFetcher
     from efi_builder import downloader

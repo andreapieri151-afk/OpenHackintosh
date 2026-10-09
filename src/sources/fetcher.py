@@ -38,6 +38,23 @@ def source_cache_name(source: SourceSpec) -> str:
     return "archive.bin"
 
 
+def resolve_asset_pattern(pattern: str, context: Optional[dict]) -> str:
+    """Risolve i template nel pattern asset (es. ``{macos}`` per AirportItlwm).
+
+    Se il pattern usa un segnaposto ma il contesto non lo fornisce -> errore
+    esplicito: mai selezioni silenziosi di asset sbagliati.
+    """
+    if "{" not in pattern:
+        return pattern
+    context = context or {}
+    try:
+        return pattern.format(**context)
+    except (KeyError, IndexError) as exc:
+        raise FetchError(
+            f"il pattern asset {pattern!r} richiede un contesto non fornito: {exc}"
+        ) from exc
+
+
 def pick_asset(assets: list, pattern: str) -> Optional[dict]:
     """Sceglie l'asset di una release GitHub con fnmatch sul nome.
 
@@ -84,7 +101,10 @@ class InMemoryFetcher:
     def register_bytes(self, source: SourceSpec, data: bytes) -> None:
         self.files[self.bytes_key(source)] = data
 
-    def fetch_archive(self, source: SourceSpec) -> Path:
+    def fetch_archive(self, source: SourceSpec, context: Optional[dict] = None) -> Path:
+        # Stesso contratto del fetcher reale: i template nel pattern devono
+        # potersi risolvere col contesto fornito dalla pipeline.
+        resolve_asset_pattern(source.asset, context)
         self.calls.append(("archive", source_cache_name(source)))
         data = self.archives.get(source_cache_name(source))
         if data is None:
@@ -95,7 +115,7 @@ class InMemoryFetcher:
         dest.write_bytes(data)
         return dest
 
-    def fetch_bytes(self, source: SourceSpec) -> Tuple[bytes, str]:
+    def fetch_bytes(self, source: SourceSpec, context: Optional[dict] = None) -> Tuple[bytes, str]:
         key = self.bytes_key(source)
         self.calls.append(("bytes", key))
         data = self.files.get(key)
@@ -149,7 +169,7 @@ class GitHubFetcher:
 
     # -- Interfaccia Fetcher -------------------------------------------------
 
-    def fetch_archive(self, source: SourceSpec) -> Path:
+    def fetch_archive(self, source: SourceSpec, context: Optional[dict] = None) -> Path:
         if source.type != "github_release":
             raise FetchError(f"fetch_archive supporta solo github_release, non {source.type!r}")
 
@@ -157,10 +177,18 @@ class GitHubFetcher:
         if not release:
             raise FetchError(f"release non trovata: {source.repo} ({source.tag})")
 
-        asset = pick_asset(release.get("assets", []), source.asset)
+        pattern = resolve_asset_pattern(source.asset, context)
+        asset = pick_asset(release.get("assets", []), pattern)
         if not asset:
             raise FetchError(
-                f"nessun asset corrisponde al pattern {source.asset!r} in {source.repo}"
+                f"nessun asset corrisponde al pattern {pattern!r} in {source.repo}"
+            )
+
+        # Hardening 2.0.2: MAI build DEBUG. Solo RELEASE ufficiali.
+        asset_name = asset.get("name", "")
+        if "debug" in asset_name.lower():
+            raise FetchError(
+                f"asset DEBUG rifiutato (solo RELEASE ufficiali): {asset_name}"
             )
 
         cache_name = asset["name"]
@@ -184,7 +212,7 @@ class GitHubFetcher:
 
         raise FetchError(f"archivio corrotto dopo 2 tentativi: {url}")
 
-    def fetch_bytes(self, source: SourceSpec) -> Tuple[bytes, str]:
+    def fetch_bytes(self, source: SourceSpec, context: Optional[dict] = None) -> Tuple[bytes, str]:
         if source.type == "github_raw":
             url = f"https://raw.githubusercontent.com/{source.repo}/{source.ref}/{source.path}"
         elif source.type == "url":

@@ -47,6 +47,33 @@ dichiarativo (JSON) che un algoritmo di generazione consuma passo passo:
   magic sbagliato, placeholder AML, min_size, sha256 mismatch, zip corrotto),
   opzionali che non bloccano, GitHubFetcher senza rete (monkeypatch).
 
+### Aggiunto — hardening fonti (solo RELEASE, mai DEBUG, mai file finti)
+
+- **Divieto DEBUG a due livelli**: lo schema del manifest rifiuta pattern
+  asset contenenti "DEBUG"; il fetcher rifiuta comunque un asset DEBUG anche
+  se selezionato (doppia barriera).
+- **Versioni pinnate** nel manifest del Q556/2, verificate via GitHub API il
+  2026-10-09: OpenCorePkg 1.0.8, Lilu 1.7.2, VirtualSMC 1.3.8,
+  WhateverGreen 1.7.1, AppleALC 1.9.8, NVMeFix 1.1.3, RestrictEvents 1.1.6,
+  RealtekRTL8111 v3.0.0 (Mieze — verificato che in Acidanthera NON esiste),
+  itlwm v2.3.0, IntelBluetoothFirmware v2.4.0. Asset sempre `*-RELEASE.zip`.
+- **Template `{macos}` nei pattern asset**: AirportItlwm pubblica un binario
+  diverso per ogni macOS; il motore risolve il pattern sul macOS target
+  (Ventura -> `AirportItlwm_v2.3.0_stable_Ventura.kext.zip`). Se il macOS
+  non ha una variante dichiarata (es. Sequoia con itlwm v2.3.0) il
+  componente fallisce con errore esplicito: mai un kext per il macOS
+  sbagliato.
+- `provenance` aggiornato: componenti Acidanthera/OpenCorePkg/Dortania/Mieze
+  -> `verified`; OpenIntelWireless (wifi/bluetooth opzionali) resta
+  `default` in attesa di conferma.
+
+### Rimosso
+
+- **Le 5 EFI "sample" in `releases/`** (`EFI-Q5562-*.zip`): contenevano
+  binari finti/vuoti (file da 0 byte, "binari" da 4KB). Sono esattamente il
+  problema che OpenHackintosh e' nato per eliminare. Le release del tool
+  (`OpenHackintosh-*.zip`) restano.
+
 ### Corretto
 
 - Import circolare latente `database -> matcher -> hardware -> snapshot ->
@@ -57,9 +84,10 @@ dichiarativo (JSON) che un algoritmo di generazione consuma passo passo:
 ### Roadmap 2.0.2 (in corso)
 
 - [x] Algoritmo di generazione dichiarativa + sources manifest + test
-- [ ] Conferma/pin delle fonti GitHub del Q556/2 (repo, tag, sha256)
+- [x] Fonti pinnate RELEASE-only per il Q556/2 (repo + tag verificati; sha256 alla prima build su rete completa)
 - [ ] USB mapping automatico
 - [ ] Sources engine come motore di default + release 2.0.2 Stable in `releases/`
+- [ ] (Valutazione post-2.0.2) Layer AI opzionale con chiave API esterna: spiegazioni + analisi supporto macchina
 
 ## 2.0.1 Stable - 2026-09-19 — WINDOWS + LINUX, FINE DELLA BETA
 
