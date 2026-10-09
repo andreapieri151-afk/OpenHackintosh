@@ -1,12 +1,12 @@
 #!/bin/bash
-# OpenHackintosh 2.0.1 Stable — macOS launcher
+# OpenHackintosh 2.0.2 Stable — macOS launcher
 # Doppio click su macOS: apre il Terminale e avvia la CLI.
 # Non usa path assoluti: lavora nella directory del progetto.
 
 cd "$(dirname "$0")" || exit 1
 
 echo "╔════════════════════════════════════════════════════════════╗"
-echo "║  OpenHackintosh 2.0.1 Stable (macOS)                       ║"
+echo "║  OpenHackintosh 2.0.2 Stable (macOS)                       ║"
 echo "║  CLI-first · Hardware Detection · EFI hardenizzata          ║"
 echo "╚════════════════════════════════════════════════════════════╝"
 echo ""

@@ -9,6 +9,111 @@ from database import load_all_profiles, get_profile, match_profile
 from efi.generator import build_efi
 from cli.output import Out
 
+#: Motore di default dalla 2.0.2: il sources engine genera la EFI dal
+#: database delle fonti. I profili senza manifest ripiegano su legacy.
+DEFAULT_ENGINE = "manifest"
+
+
+def _resolve_engine(args, profile_id: str) -> str:
+    """Sceglie il motore: manifest se richiesto/disponibile, altrimenti legacy."""
+    if getattr(args, "manifest", None):
+        return "manifest"
+    engine = getattr(args, "engine", DEFAULT_ENGINE) or DEFAULT_ENGINE
+    if engine != "manifest":
+        return "legacy"
+    from sources import manifest_path_for
+
+    return "manifest" if manifest_path_for(profile_id).exists() else "legacy"
+
+
+def run_generate_manifest_engine(args, profile, output_dir: Path, out: Out) -> dict:
+    """Sources engine v1 (2.0.2): EFI generata dal database delle fonti."""
+    import contextlib
+    import io
+
+    from sources import (
+        GitHubFetcher,
+        ManifestError,
+        load_manifest,
+        load_manifest_for_profile,
+        run_manifest_pipeline,
+    )
+
+    try:
+        if args.manifest:
+            manifest = load_manifest(Path(args.manifest))
+        else:
+            manifest = load_manifest_for_profile(profile.id)
+    except ManifestError as exc:
+        msg = f"Sources manifest non disponibile per {profile.id}: {exc}"
+        out.data({"ok": False, "error": msg}, "Errore")
+        raise SystemExit(2)
+
+    fetcher = GitHubFetcher(output_dir / "downloads")
+    log = (lambda msg: None) if out.json_output else print
+
+    if out.json_output:
+        with contextlib.redirect_stdout(io.StringIO()):
+            result = run_manifest_pipeline(
+                manifest=manifest,
+                profile=profile,
+                output_dir=output_dir,
+                fetcher=fetcher,
+                smbios_model=args.smbios,
+                audio_layout=args.audio_layout,
+                macos_version=args.macos,
+                include_wifi=args.wifi,
+                include_bluetooth=args.bluetooth,
+                include_nvme=args.include_nvme,
+                include_restrict_events=args.include_restrict_events,
+                include_optional_drivers=args.include_optional_drivers,
+                include_usb_mapping=args.usb_map,
+                generate_zip=not args.no_zip,
+                dev=args.dev,
+                log=log,
+            )
+    else:
+        result = run_manifest_pipeline(
+            manifest=manifest,
+            profile=profile,
+            output_dir=output_dir,
+            fetcher=fetcher,
+            smbios_model=args.smbios,
+            audio_layout=args.audio_layout,
+            macos_version=args.macos,
+            include_wifi=args.wifi,
+            include_bluetooth=args.bluetooth,
+            include_nvme=args.include_nvme,
+            include_restrict_events=args.include_restrict_events,
+            include_optional_drivers=args.include_optional_drivers,
+            include_usb_mapping=args.usb_map,
+            generate_zip=not args.no_zip,
+            dev=args.dev,
+            log=log,
+        )
+
+    if result.get("success"):
+        out.data(result, "Esito")
+        if not out.json_output:
+            print("\nComponenti materializzati:")
+            for comp in result["components"]:
+                mark = {"OK": "OK  ", "GENERATED": "GEN ", "SKIPPED": "SKIP"}.get(comp["status"], "FAIL")
+                print(f"  {mark} {comp['component_id']:22} {comp['target']}")
+            print(f"\nEFI STATUS: {result['efi_status']} (sources engine v1)")
+        return result
+
+    out.data({
+        "ok": False,
+        "success": False,
+        "error": result.get("error", "EFI generation aborted"),
+        "efi_status": result.get("efi_status", "FAILED"),
+        "components": result.get("components", []),
+    }, "Errore")
+    if not out.json_output:
+        print(f"\nEFI STATUS: FAILED (sources engine v1)")
+        print("EFI generation aborted.")
+    return result
+
 
 def _print_report_generation(result: dict) -> None:
     report = result.get("generation_report") or {}
@@ -72,6 +177,16 @@ def run_generate(args, out: Out) -> dict:
         raise SystemExit(2)
 
     output_dir = Path(args.output)
+
+    engine = _resolve_engine(args, profile.id)
+    if engine == "manifest":
+        if getattr(args, "engine", DEFAULT_ENGINE) == "manifest" and not getattr(args, "manifest", None):
+            if not out.json_output:
+                print(f"(motore: sources engine v1 — manifest del profilo {profile.id})")
+        return run_generate_manifest_engine(args, profile, output_dir, out)
+
+    if not out.json_output:
+        print("(motore: builder legacy)")
     result = build_efi(
         profile=profile,
         output_dir=output_dir,

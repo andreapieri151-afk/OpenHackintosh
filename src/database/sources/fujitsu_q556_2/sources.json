@@ -1,0 +1,300 @@
+{
+  "manifest_version": 1,
+  "profile_id": "fujitsu_q556_2",
+  "name": "Sources database — Fujitsu Esprimo Q556/2",
+  "description": "Tutti i file della EFI e le fonti ufficiali da cui scaricarli. Regola 2.0.2: SOLO build RELEASE ufficiali (mai DEBUG, mai file finti/d'esempio). Versioni pinnate al 2026-10-09 verificando le release via GitHub API. provenance 'verified' = fonte e release verificate; 'default' = da confermare. I pin sha256 verranno aggiunti alla verifica su rete completa.",
+  "components": [
+    {
+      "id": "opencore",
+      "kind": "efi_binary",
+      "required": true,
+      "target": "OC/OpenCore.efi",
+      "min_size": 50000,
+      "provenance": "verified",
+      "source": {
+        "type": "github_release",
+        "repo": "acidanthera/OpenCorePkg",
+        "tag": "1.0.8",
+        "asset": "OpenCore-*-RELEASE.zip",
+        "path_in_archive": "X64/EFI/OC/OpenCore.efi"
+      },
+      "notes": "Bootloader OpenCore (Acidanthera, release 1.0.8). L'asset RELEASE contiene l'intera struttura EFI X64."
+    },
+    {
+      "id": "bootx64",
+      "kind": "efi_binary",
+      "required": true,
+      "target": "BOOT/BOOTx64.efi",
+      "min_size": 20000,
+      "provenance": "verified",
+      "source": {
+        "type": "github_release",
+        "repo": "acidanthera/OpenCorePkg",
+        "tag": "1.0.8",
+        "asset": "OpenCore-*-RELEASE.zip",
+        "path_in_archive": "X64/EFI/BOOT/BOOTx64.efi"
+      },
+      "notes": "Stesso archivio RELEASE di OpenCore: un solo download per tutti i binari OpenCorePkg."
+    },
+    {
+      "id": "hfsplus",
+      "kind": "efi_binary",
+      "required": true,
+      "target": "OC/Drivers/HfsPlus.efi",
+      "min_size": 20000,
+      "provenance": "verified",
+      "source": {
+        "type": "github_release",
+        "repo": "acidanthera/OpenCorePkg",
+        "tag": "1.0.8",
+        "asset": "OpenCore-*-RELEASE.zip",
+        "path_in_archive": "X64/EFI/OC/Drivers/HfsPlus.efi"
+      },
+      "notes": "Driver HFS+ per leggere il volume di avvio macOS."
+    },
+    {
+      "id": "openruntime",
+      "kind": "efi_binary",
+      "required": true,
+      "target": "OC/Drivers/OpenRuntime.efi",
+      "min_size": 10000,
+      "provenance": "verified",
+      "source": {
+        "type": "github_release",
+        "repo": "acidanthera/OpenCorePkg",
+        "tag": "1.0.8",
+        "asset": "OpenCore-*-RELEASE.zip",
+        "path_in_archive": "X64/EFI/OC/Drivers/OpenRuntime.efi"
+      },
+      "notes": "Runtime services (NVRAM, variabili UEFI)."
+    },
+    {
+      "id": "lilu",
+      "kind": "kext",
+      "required": true,
+      "target": "OC/Kexts/Lilu.kext",
+      "provenance": "verified",
+      "source": {
+        "type": "github_release",
+        "repo": "acidanthera/Lilu",
+        "tag": "1.7.2",
+        "asset": "Lilu-*-RELEASE.zip"
+      },
+      "notes": "Patch engine: richiesto da VirtualSMC/WhateverGreen/AppleALC. Build RELEASE."
+    },
+    {
+      "id": "virtualsmc",
+      "kind": "kext",
+      "required": true,
+      "target": "OC/Kexts/VirtualSMC.kext",
+      "provenance": "verified",
+      "source": {
+        "type": "github_release",
+        "repo": "acidanthera/VirtualSMC",
+        "tag": "1.3.8",
+        "asset": "VirtualSMC-*-RELEASE.zip"
+      },
+      "notes": "Emulazione SMC (build RELEASE). I plugin (SMCProcessor/SMCSuperIO) non sono inclusi: non servono al boot del Q556/2."
+    },
+    {
+      "id": "whatevergreen",
+      "kind": "kext",
+      "required": true,
+      "target": "OC/Kexts/WhateverGreen.kext",
+      "provenance": "verified",
+      "source": {
+        "type": "github_release",
+        "repo": "acidanthera/WhateverGreen",
+        "tag": "1.7.1",
+        "asset": "WhateverGreen-*-RELEASE.zip"
+      },
+      "notes": "Patching GPU (HD 530/630), build RELEASE."
+    },
+    {
+      "id": "applealc",
+      "kind": "kext",
+      "required": true,
+      "target": "OC/Kexts/AppleALC.kext",
+      "provenance": "verified",
+      "source": {
+        "type": "github_release",
+        "repo": "acidanthera/AppleALC",
+        "tag": "1.9.8",
+        "asset": "AppleALC-*-RELEASE.zip"
+      },
+      "notes": "Audio ALC671 (layout-id di default 11, configurato in config.plist), build RELEASE."
+    },
+    {
+      "id": "realtekrtl8111",
+      "kind": "kext",
+      "required": true,
+      "target": "OC/Kexts/RealtekRTL8111.kext",
+      "provenance": "verified",
+      "source": {
+        "type": "github_release",
+        "repo": "Mieze/RTL8111_driver_for_OS_X",
+        "tag": "v3.0.0",
+        "asset": "RealtekRTL8111-V*.zip"
+      },
+      "notes": "LAN Realtek RTL8111GN del Q556/2. NON esiste in Acidanthera (verificato: 404); l'unica fonte ufficiale e' Mieze (upstream usato anche da Dortania), release v3.0.0."
+    },
+    {
+      "id": "ssdt_plug",
+      "kind": "aml",
+      "required": true,
+      "target": "OC/ACPI/SSDT-PLUG-DRTNIA.aml",
+      "provenance": "verified",
+      "source": {
+        "type": "github_raw",
+        "repo": "dortania/Getting-Started-With-ACPI",
+        "ref": "master",
+        "path": "extra-files/compiled/SSDT-PLUG-DRTNIA.aml"
+      },
+      "notes": "XCPM/CPU power management (variante DRTNIA, Dortania, file compilato ufficiale)."
+    },
+    {
+      "id": "ssdt_ec_usbx",
+      "kind": "aml",
+      "required": true,
+      "target": "OC/ACPI/SSDT-EC-USBX-DESKTOP.aml",
+      "provenance": "verified",
+      "source": {
+        "type": "github_raw",
+        "repo": "dortania/Getting-Started-With-ACPI",
+        "ref": "master",
+        "path": "extra-files/compiled/SSDT-EC-USBX-DESKTOP.aml"
+      },
+      "notes": "Embedded Controller + USB power (variante desktop, Dortania, file compilato ufficiale)."
+    },
+    {
+      "id": "config_plist",
+      "kind": "generated",
+      "required": true,
+      "target": "OC/config.plist",
+      "provenance": "verified",
+      "source": {
+        "type": "generated",
+        "generator": "config.plist"
+      },
+      "notes": "Generato dal motore a partire dal profilo (DeviceProperties, boot-args, SMBIOS)."
+    },
+    {
+      "id": "readme_efi",
+      "kind": "generated",
+      "required": true,
+      "scope": "output",
+      "target": "README_EFI.txt",
+      "provenance": "verified",
+      "source": {
+        "type": "generated",
+        "generator": "readme"
+      },
+      "notes": "Riepilogo componenti + fonti + sha256 (provenance ledger)."
+    },
+    {
+      "id": "usb_map",
+      "kind": "generated",
+      "required": false,
+      "optional_group": "usb_mapping",
+      "target": "OC/Kexts/USBMap_Q5562.kext",
+      "provenance": "verified",
+      "source": {
+        "type": "generated",
+        "generator": "usb_map"
+      },
+      "notes": "Mappa USB generata automaticamente dalla detection del controller XHCI (sysfs su Linux): inject-kext USBMap con porte rilevate. Bozza: i tipi connettore vanno verificati dopo l'installazione. Se il controller non e' rilevabile il componente viene scartato, mai inventato. Si include con --usb-map."
+    },
+    {
+      "id": "nvmefix",
+      "kind": "kext",
+      "required": false,
+      "optional_group": "nvme",
+      "target": "OC/Kexts/NVMeFix.kext",
+      "provenance": "verified",
+      "source": {
+        "type": "github_release",
+        "repo": "acidanthera/NVMeFix",
+        "tag": "1.1.3",
+        "asset": "NVMeFix-*-RELEASE.zip"
+      },
+      "notes": "Opzionale: power management NVMe (--include-nvme), build RELEASE."
+    },
+    {
+      "id": "restrictevents",
+      "kind": "kext",
+      "required": false,
+      "optional_group": "restrict_events",
+      "target": "OC/Kexts/RestrictEvents.kext",
+      "provenance": "verified",
+      "source": {
+        "type": "github_release",
+        "repo": "acidanthera/RestrictEvents",
+        "tag": "1.1.6",
+        "asset": "RestrictEvents-*-RELEASE.zip"
+      },
+      "notes": "Opzionale: blocca processi/avvisi indesiderati (--include-restrict-events), build RELEASE."
+    },
+    {
+      "id": "airportitlwm",
+      "kind": "kext",
+      "required": false,
+      "optional_group": "wifi",
+      "target": "OC/Kexts/AirportItlwm.kext",
+      "provenance": "default",
+      "source": {
+        "type": "github_release",
+        "repo": "OpenIntelWireless/itlwm",
+        "tag": "v2.3.0",
+        "asset": "AirportItlwm_*_stable_{macos}.kext.zip"
+      },
+      "notes": "Opzionale: Wi-Fi Intel (--wifi). itlwm pubblica UN asset per versione macOS: il template {macos} viene risolto dal motore sul macOS target (Ventura -> AirportItlwm_v2.3.0_stable_Ventura.kext.zip). Nessuna build per Sequoia in v2.3.0: il componente fallisce in modo esplicito invece di usare un kext sbagliato. Fonte OpenIntelWireless da confermare."
+    },
+    {
+      "id": "intelbluetoothfirmware",
+      "kind": "kext",
+      "required": false,
+      "optional_group": "bluetooth",
+      "target": "OC/Kexts/IntelBluetoothFirmware.kext",
+      "provenance": "default",
+      "source": {
+        "type": "github_release",
+        "repo": "OpenIntelWireless/IntelBluetoothFirmware",
+        "tag": "v2.4.0",
+        "asset": "IntelBluetooth-*.zip"
+      },
+      "notes": "Opzionale: Bluetooth Intel (--bluetooth). Fonte OpenIntelWireless da confermare."
+    },
+    {
+      "id": "opencanopy",
+      "kind": "efi_binary",
+      "required": false,
+      "optional_group": "optional_drivers",
+      "target": "OC/Drivers/OpenCanopy.efi",
+      "provenance": "verified",
+      "source": {
+        "type": "github_release",
+        "repo": "acidanthera/OpenCorePkg",
+        "tag": "1.0.8",
+        "asset": "OpenCore-*-RELEASE.zip",
+        "path_in_archive": "X64/EFI/OC/Drivers/OpenCanopy.efi"
+      },
+      "notes": "Opzionale: boot picker grafico (--include-optional-drivers)."
+    },
+    {
+      "id": "resetnvramentry",
+      "kind": "efi_binary",
+      "required": false,
+      "optional_group": "optional_drivers",
+      "target": "OC/Drivers/ResetNvramEntry.efi",
+      "provenance": "verified",
+      "source": {
+        "type": "github_release",
+        "repo": "acidanthera/OpenCorePkg",
+        "tag": "1.0.8",
+        "asset": "OpenCore-*-RELEASE.zip",
+        "path_in_archive": "X64/EFI/OC/Drivers/ResetNvramEntry.efi"
+      },
+      "notes": "Opzionale: voce Reset NVRAM nel boot menu (--include-optional-drivers)."
+    }
+  ]
+}

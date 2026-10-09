@@ -11,9 +11,15 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 import re
-from hardware.detection import UNKNOWN
-from hardware.identification import HardwareIdentity
+from typing import TYPE_CHECKING
+
 from database.loader import HardwareProfile
+
+if TYPE_CHECKING:  # pragma: no cover - solo typing
+    from hardware.identification import HardwareIdentity
+
+# NB: gli import da `hardware` sono lazy (dentro le funzioni) per spezzare il
+# ciclo database -> matcher -> hardware -> snapshot -> database.
 
 
 MATCH_EXACT = "EXACT_MATCH"
@@ -79,6 +85,8 @@ MIN_SCORE = 2
 
 
 def _contains(needle: str, hay: Optional[str]) -> bool:
+    from hardware.detection import UNKNOWN  # lazy: evita import circolare
+
     if not needle or not hay:
         return False
     needle = needle.lower().strip()

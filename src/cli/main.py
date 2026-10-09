@@ -35,6 +35,7 @@ from .commands import (
     run_doctor,
     run_database,
     run_bios,
+    run_sources,
 )
 
 from version import VERSION_LABEL as VERSION  # unica fonte: src/version.py
@@ -78,6 +79,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_gen.add_argument("--include-nvme", action="store_true", help="Includi kext opzionale NVMeFix")
     p_gen.add_argument("--include-restrict-events", action="store_true", help="Includi kext opzionale RestrictEvents")
     p_gen.add_argument("--include-optional-drivers", action="store_true", help="Includi driver opzionali del profilo")
+    p_gen.add_argument("--usb-map", action="store_true",
+                       help="Genera la mappa USB automatica (inject-kext USBMap, engine manifest)")
+    p_gen.add_argument("--engine", choices=["legacy", "manifest"], default="manifest",
+                       help="manifest: sources engine v1 (default dalla 2.0.2, database delle fonti); legacy: builder storico")
+    p_gen.add_argument("--manifest", default=None, help="Percorso sources manifest custom (implica --engine manifest)")
     p_gen.set_defaults(func=run_generate)
 
     p_val = sub.add_parser("validate", parents=[common], help="Valida una EFI")
@@ -98,6 +104,17 @@ def build_parser() -> argparse.ArgumentParser:
     p_show = db_sub.add_parser("show", parents=[common], help="Mostra profilo")
     p_show.add_argument("id")
     p_show.set_defaults(func=run_database, db_command="show")
+
+    p_src = sub.add_parser("sources", parents=[common], help="Database delle fonti (sources engine 2.0.2)")
+    src_sub = p_src.add_subparsers(dest="sources_command")
+    p_src_list = src_sub.add_parser("list", parents=[common], help="Elenca i profili con sources manifest")
+    p_src_list.set_defaults(func=run_sources, sources_command="list")
+    p_src_show = src_sub.add_parser("show", parents=[common], help="Mostra file e fonti del manifest")
+    p_src_show.add_argument("--profile", required=True, help="ID profilo (es. fujitsu_q556_2)")
+    p_src_show.set_defaults(func=run_sources, sources_command="show")
+    p_src_check = src_sub.add_parser("check", parents=[common], help="Verifica coerenza manifest <-> profilo")
+    p_src_check.add_argument("--profile", required=True, help="ID profilo (es. fujitsu_q556_2)")
+    p_src_check.set_defaults(func=run_sources, sources_command="check")
 
     p_ask = sub.add_parser("ask", parents=[common], help="Fai una domanda all'assistant (dati strutturati)")
     p_ask.add_argument("question", nargs="*")

@@ -1,5 +1,125 @@
 # Changelog - Tutte le bestemmie in ordine cronologico
 
+## 2.0.2 Stable - 2026-10-09 — SOURCES ENGINE DI DEFAULT + USB MAPPING
+
+La 2.0.2 cambia il cuore del tool: i file della EFI e le fonti da cui
+scaricarli non sono più hardcoded nel builder, ma vivono in un database
+dichiarativo (JSON) che un algoritmo di generazione consuma passo passo:
+
+    Sources Manifest -> FETCH -> VERIFY -> ASSEMBLE -> AUDIT -> ZIP
+
+Dalla 2.0.2 Stable il sources engine e' il **motore di default** di
+`generate` (`--engine legacy` per il builder storico). I profili senza
+sources manifest (es. fujitsu_q957) ripiegano su legacy automaticamente.
+
+### Aggiunto — sources engine v1 (`src/sources/`)
+
+- **Sources manifest** (`src/database/sources/<profilo>/sources.json`): per
+  ogni file della EFI dichiara kind (`efi_binary`/`kext`/`aml`/`generated`),
+  target nella cartella EFI, fonte (`github_release`/`github_raw`/`url`/
+  `generated`), `min_size`, pin `sha256` opzionale, required/optional_group e
+  `provenance` (`default` = fonte canonica ufficiale; `verified` = confermata
+  dal maintainer). Schema rigido: campi sconosciuti, target duplicati, path
+  traversal e incoerenze kind/source sono errori di validazione.
+- **Manifest del Fujitsu Esprimo Q556/2** (`fujitsu_q556_2`): 19 componenti —
+  OpenCore/BOOTx64/HfsPlus/OpenRuntime da `acidanthera/OpenCorePkg`, kext da
+  `acidanthera/*` e `Mieze/RTL8111_driver_for_OS_X`, SSDT da Dortania,
+  config.plist e README generati dal motore. Tutte le fonti sono `default`:
+  da confermare/pinnare (passo successivo del rilascio 2.0.2).
+- **Loader + consistency check**: il manifest deve coprire TUTTI i kext,
+  driver e SSDT required del profilo hardware, altrimenti la generazione
+  si rifiuta di partire (prima ancora di toccare la rete).
+- **Fetcher iniettabile**: `GitHubFetcher` (produzione: Releases API, cache,
+  invalidazione zip corrotti, fallback SSL) e `InMemoryFetcher` (test
+  offline). La rete entra in un solo punto del motore.
+- **Resolver**: estrazione esatta del file/bundle dichiarato dall'archivio +
+  validazione binaria reale (PE/COFF, Mach-O/kext bundle, firma AML) +
+  min_size + sha256 pin. Esiti per componente: OK / FAILED / SKIPPED.
+- **Pipeline**: assembly dell'albero EFI, generazione config.plist/SMBIOS/
+  README con **provenance ledger** (fonte + sha256 per ogni componente),
+  final audit riusato dalla 2.0.1, ZIP `EFI_<PROFILO>.zip`. Se un componente
+  required fallisce: FAILED, niente ZIP, niente EFI parziale.
+- **CLI**:
+  - `openhackintosh sources list|show|check --profile <id>` — consulta e
+    valida il database delle fonti;
+  - `openhackintosh generate --engine manifest` (e `--manifest <path>`) —
+    genera la EFI col sources engine. Il motore di default resta `legacy`
+    finché le fonti non saranno confermate/pinnate.
+- **Test**: 56 nuovi test (319 totali, tutti verdi) — schema/validazione,
+  coerenza manifest↔profilo, pipeline end-to-end offline con binari
+  sintetici validi, tutti i failure mode (archivio mancante, kext 0-byte,
+  magic sbagliato, placeholder AML, min_size, sha256 mismatch, zip corrotto),
+  opzionali che non bloccano, GitHubFetcher senza rete (monkeypatch).
+
+### Aggiunto — hardening fonti (solo RELEASE, mai DEBUG, mai file finti)
+
+- **Divieto DEBUG a due livelli**: lo schema del manifest rifiuta pattern
+  asset contenenti "DEBUG"; il fetcher rifiuta comunque un asset DEBUG anche
+  se selezionato (doppia barriera).
+- **Versioni pinnate** nel manifest del Q556/2, verificate via GitHub API il
+  2026-10-09: OpenCorePkg 1.0.8, Lilu 1.7.2, VirtualSMC 1.3.8,
+  WhateverGreen 1.7.1, AppleALC 1.9.8, NVMeFix 1.1.3, RestrictEvents 1.1.6,
+  RealtekRTL8111 v3.0.0 (Mieze — verificato che in Acidanthera NON esiste),
+  itlwm v2.3.0, IntelBluetoothFirmware v2.4.0. Asset sempre `*-RELEASE.zip`.
+- **Template `{macos}` nei pattern asset**: AirportItlwm pubblica un binario
+  diverso per ogni macOS; il motore risolve il pattern sul macOS target
+  (Ventura -> `AirportItlwm_v2.3.0_stable_Ventura.kext.zip`). Se il macOS
+  non ha una variante dichiarata (es. Sequoia con itlwm v2.3.0) il
+  componente fallisce con errore esplicito: mai un kext per il macOS
+  sbagliato.
+- `provenance` aggiornato: componenti Acidanthera/OpenCorePkg/Dortania/Mieze
+  -> `verified`; OpenIntelWireless (wifi/bluetooth opzionali) resta
+  `default` in attesa di conferma.
+
+### Aggiunto — USB mapping automatico (`src/usb_mapping/`)
+
+- **Detection dei controller XHCI** via sysfs (Linux): classe PCI 0x0c0330,
+  PCI ID, slot in formato `pcidebug` e **conteggio reale dei porti** dal
+  root hub (oggetti `usbN-portM`). Radice sysfs iniettabile -> testabile su
+  albero finto, nessuna dipendenza dall'hardware reale. Su Windows/macOS la
+  topologia non e' rilevabile: la mappa NON viene generata (mai inventata).
+- **Generazione inject-kext USBMap** nel formato canonico
+  (personalita' `AppleUSBHostMergeProperties`, `port-count`, dizionario
+  `ports` con `UsbConnector`/`port`), con metadati OpenHackintosh che
+  dichiarano lo stato DRAFT: i tipi connettore vanno verificati dopo
+  l'installazione.
+- **Validazione inject-kext** (`validate_inject_kext`): un bundle solo
+  Info.plist (come i veri USBMap.kext) e' legittimo se ha IOKitPersonalities
+  non vuote e bundle identifier; il validator dell'EFI ora lo accetta. Un
+  bundle vuoto/placeholder resta INVALID.
+- **Integrazione nel sources engine**: componente `usb_map` nel manifest del
+  Q556/2 (opzionale, gruppo `usb_mapping`), generato PRIMA di config.plist
+  cosi' finisce in Kernel/Add e nello ZIP. Se nessun controller e'
+  rilevabile il componente viene scartato e la build resta VALID.
+- **CLI**: `generate --usb-map` (engine manifest).
+
+### Rimosso
+
+- **Le 5 EFI "sample" in `releases/`** (`EFI-Q5562-*.zip`): contenevano
+  binari finti/vuoti (file da 0 byte, "binari" da 4KB). Sono esattamente il
+  problema che OpenHackintosh e' nato per eliminare. Le release del tool
+  (`OpenHackintosh-*.zip`) restano.
+
+### Corretto
+
+- Import circolare latente `database -> matcher -> hardware -> snapshot ->
+  database`: ora `matcher` importa da `hardware` in modo lazy. Il bug era
+  invisibile finché si importava `hardware` prima di `database`; il sources
+  engine lo avrebbe attivato.
+
+### Cambiato
+
+- **Sources engine come motore di default** di `generate`: il builder legacy
+  resta disponibile con `--engine legacy` e come fallback automatico per i
+  profili senza manifest.
+- Versione: `2.0.2 Stable`; release `releases/OpenHackintosh-2.0.2.zip`.
+
+### Roadmap post-2.0.2
+
+- [ ] Pin sha256 dei binari nel manifest (richiede accesso al CDN release GitHub)
+- [ ] Sources manifest per altri profili (Q957, Lenovo Tiny, HP Mini, Dell Micro...)
+- [ ] (Valutazione) Layer AI opzionale con chiave API esterna (es. Gemini via AI Studio): spiegazioni + analisi supporto macchina. Mai senza chiave, mai decisionale sulla compatibilita'.
+
 ## 2.0.1 Stable - 2026-09-19 — WINDOWS + LINUX, FINE DELLA BETA
 
 La **2.0.1 diventa Stable**: il tool ora gira nativamente su **Windows, Linux

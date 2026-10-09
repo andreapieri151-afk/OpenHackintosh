@@ -22,11 +22,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 RELEASES = ROOT / "releases"
 
-DEFAULT_VERSION = "2.0.1 Stable"
+DEFAULT_VERSION = "2.0.2 Stable"
 
 #: Timestamp fisso dei file nello ZIP (build riproducibile): data della release.
-ZIP_TIMESTAMP = (2026, 9, 19, 12, 0, 0)
-DEFAULT_ZIP = "OpenHackintosh-2.0.1.zip"
+ZIP_TIMESTAMP = (2026, 10, 9, 12, 0, 0)
+DEFAULT_ZIP = "OpenHackintosh-2.0.2.zip"
 
 #: File di primo livello inclusi nella distribuzione.
 TOP_LEVEL_FILES = [

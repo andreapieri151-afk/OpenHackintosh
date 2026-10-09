@@ -1,5 +1,5 @@
 @echo off
-rem OpenHackintosh 2.0.1 Stable - launcher Windows
+rem OpenHackintosh 2.0.2 Stable - launcher Windows
 rem Doppio click oppure: OpenHackintosh.bat [comando] [opzioni]
 rem Non usa path assoluti: lavora nella cartella del progetto.
 
@@ -10,7 +10,7 @@ rem Console in UTF-8: evita errori di encoding con emoji/simboli.
 chcp 65001 >nul 2>&1
 
 echo +----------------------------------------------------------+
-echo ^|  OpenHackintosh 2.0.1 Stable (Windows)                    ^|
+echo ^|  OpenHackintosh 2.0.2 Stable (Windows)                    ^|
 echo ^|  CLI-first - Hardware Detection - EFI con file veri       ^|
 echo +----------------------------------------------------------+
 echo.
