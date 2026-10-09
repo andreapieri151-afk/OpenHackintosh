@@ -417,6 +417,7 @@ pty = pytest.importorskip("pty") if os.name == "posix" else None
 
 PTY_DRIVER = r"""
 import sys
+import time
 sys.path.insert(0, {src!r})
 from cli.interactive import run_menu
 n = int(sys.argv[1])
@@ -425,11 +426,30 @@ items.append({{"label": "Exit", "action": "exit"}})
 choice = run_menu(items)
 sys.stdout.write("\r\nRESULT=" + choice["action"] + "\r\n")
 sys.stdout.flush()
+# Resta vivo dopo il risultato: su macOS il pty master restituisce EIO appena
+# lo slave chiude, e il genitore potrebbe non riuscire a leggere l'output.
+# Il test termina il figlio comunque (kill nel finally).
+time.sleep(5)
 """
 
 
-def _run_in_pty(keys, count=10, timeout=10.0, key_delay=0.2):
+def _read_available(fd, wait: float) -> bytes:
+    """Legge cio' che c'e' sul pty entro `wait` secondi.
+
+    b'' = timeout (niente dati); OSError (EIO su macOS quando il figlio
+    esce) -> restituito come None: nessun altro dato leggibile.
+    """
     import select as _select
+
+    if not _select.select([fd], [], [], wait)[0]:
+        return b""
+    try:
+        return os.read(fd, 65536)
+    except OSError:
+        return None
+
+
+def _run_in_pty(keys, count=10, timeout=10.0, key_delay=0.2):
     import pty as _pty
 
     src = str(__import__("pathlib").Path(__file__).resolve().parents[1] / "src")
@@ -440,39 +460,62 @@ def _run_in_pty(keys, count=10, timeout=10.0, key_delay=0.2):
         os.execv(sys.executable, [sys.executable, "-c", code, str(count)])
 
     buf = b""
+    gone = False
     try:
-        time.sleep(0.8)
+        # Aspetta che il menu sia disegnato PRIMA di inviare tasti. Uno sleep
+        # fisso era una race: su runner lenti (es. macOS CI) i tasti arrivavano
+        # prima che il figlio entrasse in modalita' di lettura e andavano persi.
+        ready_deadline = time.time() + timeout
+        while time.time() < ready_deadline and b"Opt1" not in buf:
+            chunk = _read_available(fd, 0.2)
+            if chunk is None:
+                gone = True
+                break
+            buf += chunk
+
+        # Invia i tasti leggendo CONTINUAMENTE l'output: su macOS il pty
+        # restituisce EIO appena il figlio esce, e l'output scritto va letto
+        # subito o puo' andare perso.
         for key in keys:
             if isinstance(key, float):
-                time.sleep(key)
+                end = time.time() + key
+                while time.time() < end and b"RESULT=" not in buf:
+                    chunk = _read_available(fd, 0.05)
+                    if chunk is None:
+                        gone = True
+                        break
+                    buf += chunk
                 continue
-            os.write(fd, key)
+            if gone:
+                break
+            try:
+                os.write(fd, key)
+            except OSError:  # EIO: il figlio e' gia' uscito (es. selezione avvenuta)
+                gone = True
+                break
             time.sleep(key_delay)
-            while _select.select([fd], [], [], 0.02)[0]:
-                try:
-                    chunk = os.read(fd, 65536)
-                except OSError:
-                    break
-                if not chunk:
-                    break
+            chunk = _read_available(fd, 0.05)
+            if chunk is None:
+                gone = True
+            else:
                 buf += chunk
+
         deadline = time.time() + timeout
         while time.time() < deadline and b"RESULT=" not in buf:
-            if _select.select([fd], [], [], 0.2)[0]:
-                try:
-                    chunk = os.read(fd, 65536)
-                except OSError:
-                    break
-                if not chunk:
-                    break
-                buf += chunk
+            chunk = _read_available(fd, 0.2)
+            if chunk is None:
+                break
+            buf += chunk
     finally:
         try:
             os.kill(pid, 9)
             os.waitpid(pid, 0)
         except Exception:
             pass
-        os.close(fd)
+        try:
+            os.close(fd)
+        except OSError:
+            pass
 
     text = buf.decode(errors="replace")
     for line in text.splitlines():
