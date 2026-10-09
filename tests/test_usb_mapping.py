@@ -5,6 +5,7 @@ validazione inject-kext e integrazione end-to-end nel sources engine.
 
 from __future__ import annotations
 
+import os
 import plistlib
 from pathlib import Path
 
@@ -86,6 +87,18 @@ def test_pci_slot_conversion():
 # Detection (sysfs finto)
 # ---------------------------------------------------------------------------
 
+#: I nomi dispositivo sysfs ("0000:00:14.0") contengono ':', che su Windows
+#: non e' un carattere valido nei nomi di file. La detection sysfs gira solo
+#: su Linux comunque: su Windows questi test non sono eseguibili.
+_COLON_NAMES_UNSUPPORTED = os.name == "nt"
+
+needs_colon_names = pytest.mark.skipif(
+    _COLON_NAMES_UNSUPPORTED,
+    reason="nomi dispositivo sysfs con ':' non creabili su Windows",
+)
+
+
+@needs_colon_names
 def test_detect_xhci_with_ports(tmp_path):
     root = build_fake_sysfs(tmp_path / "sys", ports=6)
     controllers = detect_usb_controllers_linux(root)
@@ -97,6 +110,7 @@ def test_detect_xhci_with_ports(tmp_path):
     assert all(p.status == "DETECTED" for p in ctrl.ports)
 
 
+@needs_colon_names
 def test_detect_ignores_non_xhci(tmp_path):
     # EHCI (0x0c0320): non e' il controller che mappiamo
     build_fake_sysfs(tmp_path / "sys", ports=2, pci_class="0x0c0320")
@@ -107,6 +121,7 @@ def test_detect_missing_sysfs(tmp_path):
     assert detect_usb_controllers_linux(tmp_path / "non_esiste") == []
 
 
+@needs_colon_names
 def test_detect_controller_without_ports(tmp_path):
     root = build_fake_sysfs(tmp_path / "sys", ports=0)
     controllers = detect_usb_controllers_linux(root)
