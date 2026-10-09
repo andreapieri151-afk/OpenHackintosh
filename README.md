@@ -14,7 +14,7 @@ Così l'ho riscritto da zero, ma **per bene**. Con file veri scaricati da GitHub
 
 **Ora supporta Q556/2 e Q957, e nei prossimi giorni aggiungerò altri dispositivi** - mini PC, laptop, desktop Skylake/Kaby Lake/Coffee Lake. Se hai un PC e vuoi che lo supporti, apri una issue con il modello e lo aggiungo.
 
-> ℹ️ **Versione attuale: OpenHackintosh 2.0.1 Stable** — gira su **Windows, Linux e macOS**, con rilevamento hardware completo su Windows e Linux. Il supporto ai singoli modelli di PC resta però da verificare sul campo: non aspettarti che ogni PC booti al primo colpo; testa e apri issue con i log.
+> ℹ️ **Versione attuale: OpenHackintosh 2.0.2 Beta 1** — gira su **Windows, Linux e macOS**, con rilevamento hardware completo su Windows e Linux. Novità: il **sources engine v1** (`generate --engine manifest`), che genera la EFI da un database dichiarativo di file e fonti (`openhackintosh sources show --profile fujitsu_q556_2`). Il supporto ai singoli modelli di PC resta però da verificare sul campo: non aspettarti che ogni PC booti al primo colpo; testa e apri issue con i log.
 
 ---
 
@@ -163,6 +163,12 @@ cd cartella_estratta
 # Profili database
 ./openhackintosh database list
 ./openhackintosh database show fujitsu_q556_2
+
+# Sources engine v1 (2.0.2): database delle fonti
+./openhackintosh sources list
+./openhackintosh sources show --profile fujitsu_q556_2
+./openhackintosh sources check --profile fujitsu_q556_2
+./openhackintosh generate --engine manifest --profile fujitsu_q556_2
 ```
 
 Tutte le opzioni sono visibili con `./openhackintosh --help`.
@@ -273,9 +279,11 @@ Tutti da GitHub ufficiale, validati (Mach-O) prima di entrare nell'EFI.
 - [x] Output JSON su tutti i comandi principali
 - [x] EFI validator avanzato (0-byte / placeholder / missing / config consistency)
 - [x] Test automatici base (pytest)
+- [x] Sources engine v1: database dichiarativo file+fonti + algoritmo di generazione (`src/sources/`, `generate --engine manifest`)
+- [ ] Conferma e pin delle fonti GitHub (repo/tag/sha256) per il Q556/2 — 2.0.2
+- [ ] USB mapping automatico — 2.0.2
 - [ ] **Nuovi dispositivi nei prossimi giorni** (Q558, Q958, Lenovo Tiny, HP Mini, Dell Micro)
 - [ ] macserial nativo per seriali più furbi
-- [ ] USB mapping automatico
 - [ ] Creazione chiavetta installer automatica
 - [ ] Supporto più hardware generico (framework già pronto)
 

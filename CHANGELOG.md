@@ -1,5 +1,66 @@
 # Changelog - Tutte le bestemmie in ordine cronologico
 
+## 2.0.2 Beta 1 - 2026-10-09 — SOURCES ENGINE: IL DATABASE DELLE FONTI
+
+La 2.0.2 introduce il **sources engine v1**: i file della EFI e le fonti da
+cui scaricarli non sono più hardcoded nel builder, ma vivono in un database
+dichiarativo (JSON) che un algoritmo di generazione consuma passo passo:
+
+    Sources Manifest -> FETCH -> VERIFY -> ASSEMBLE -> AUDIT -> ZIP
+
+### Aggiunto — sources engine v1 (`src/sources/`)
+
+- **Sources manifest** (`src/database/sources/<profilo>/sources.json`): per
+  ogni file della EFI dichiara kind (`efi_binary`/`kext`/`aml`/`generated`),
+  target nella cartella EFI, fonte (`github_release`/`github_raw`/`url`/
+  `generated`), `min_size`, pin `sha256` opzionale, required/optional_group e
+  `provenance` (`default` = fonte canonica ufficiale; `verified` = confermata
+  dal maintainer). Schema rigido: campi sconosciuti, target duplicati, path
+  traversal e incoerenze kind/source sono errori di validazione.
+- **Manifest del Fujitsu Esprimo Q556/2** (`fujitsu_q556_2`): 19 componenti —
+  OpenCore/BOOTx64/HfsPlus/OpenRuntime da `acidanthera/OpenCorePkg`, kext da
+  `acidanthera/*` e `Mieze/RTL8111_driver_for_OS_X`, SSDT da Dortania,
+  config.plist e README generati dal motore. Tutte le fonti sono `default`:
+  da confermare/pinnare (passo successivo del rilascio 2.0.2).
+- **Loader + consistency check**: il manifest deve coprire TUTTI i kext,
+  driver e SSDT required del profilo hardware, altrimenti la generazione
+  si rifiuta di partire (prima ancora di toccare la rete).
+- **Fetcher iniettabile**: `GitHubFetcher` (produzione: Releases API, cache,
+  invalidazione zip corrotti, fallback SSL) e `InMemoryFetcher` (test
+  offline). La rete entra in un solo punto del motore.
+- **Resolver**: estrazione esatta del file/bundle dichiarato dall'archivio +
+  validazione binaria reale (PE/COFF, Mach-O/kext bundle, firma AML) +
+  min_size + sha256 pin. Esiti per componente: OK / FAILED / SKIPPED.
+- **Pipeline**: assembly dell'albero EFI, generazione config.plist/SMBIOS/
+  README con **provenance ledger** (fonte + sha256 per ogni componente),
+  final audit riusato dalla 2.0.1, ZIP `EFI_<PROFILO>.zip`. Se un componente
+  required fallisce: FAILED, niente ZIP, niente EFI parziale.
+- **CLI**:
+  - `openhackintosh sources list|show|check --profile <id>` — consulta e
+    valida il database delle fonti;
+  - `openhackintosh generate --engine manifest` (e `--manifest <path>`) —
+    genera la EFI col sources engine. Il motore di default resta `legacy`
+    finché le fonti non saranno confermate/pinnate.
+- **Test**: 56 nuovi test (319 totali, tutti verdi) — schema/validazione,
+  coerenza manifest↔profilo, pipeline end-to-end offline con binari
+  sintetici validi, tutti i failure mode (archivio mancante, kext 0-byte,
+  magic sbagliato, placeholder AML, min_size, sha256 mismatch, zip corrotto),
+  opzionali che non bloccano, GitHubFetcher senza rete (monkeypatch).
+
+### Corretto
+
+- Import circolare latente `database -> matcher -> hardware -> snapshot ->
+  database`: ora `matcher` importa da `hardware` in modo lazy. Il bug era
+  invisibile finché si importava `hardware` prima di `database`; il sources
+  engine lo avrebbe attivato.
+
+### Roadmap 2.0.2 (in corso)
+
+- [x] Algoritmo di generazione dichiarativa + sources manifest + test
+- [ ] Conferma/pin delle fonti GitHub del Q556/2 (repo, tag, sha256)
+- [ ] USB mapping automatico
+- [ ] Sources engine come motore di default + release 2.0.2 Stable in `releases/`
+
 ## 2.0.1 Stable - 2026-09-19 — WINDOWS + LINUX, FINE DELLA BETA
 
 La **2.0.1 diventa Stable**: il tool ora gira nativamente su **Windows, Linux

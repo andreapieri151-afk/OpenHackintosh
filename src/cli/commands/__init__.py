@@ -7,6 +7,7 @@ from .validate import run_validate
 from .doctor import run_doctor
 from .database import run_database
 from .bios import run_bios
+from .sources import run_sources
 
 __all__ = [
     "run_detect",
@@ -18,4 +19,5 @@ __all__ = [
     "run_doctor",
     "run_database",
     "run_bios",
+    "run_sources",
 ]

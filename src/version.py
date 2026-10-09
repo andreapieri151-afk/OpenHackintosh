@@ -6,7 +6,7 @@ nei loro banner viene aggiornato a ogni release insieme a questo file.
 """
 
 #: Numero di versione (senza etichette). Es. "2.0.1".
-VERSION = "2.0.1"
+VERSION = "2.0.2"
 
 #: Etichetta completa per l'utente. Es. "2.0.1 Stable" oppure "2.0.2 Beta 1".
-VERSION_LABEL = "2.0.1 Stable"
+VERSION_LABEL = "2.0.2 Beta 1"
