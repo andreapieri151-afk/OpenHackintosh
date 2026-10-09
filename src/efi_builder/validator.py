@@ -70,13 +70,17 @@ def _aml_state(path: Path) -> str:
 
 
 def _kext_state(kext_dir: Path) -> str:
-    res = validate_kext(kext_dir)
     if not kext_dir.exists():
         return "MISSING"
+    res = validate_kext(kext_dir)
     if res.ok:
         return "REAL"
-    if res.reason in ("MISSING_OR_EMPTY_INFO_PLIST", "MISSING_EXECUTABLE", "NOT_MACH_O", "PLACEHOLDER"):
-        return "INVALID"
+    # Inject-kext (solo Info.plist, es. USBMap.kext): legittimo senza eseguibile.
+    if res.reason in ("MISSING_EXECUTABLE", "MISSING_CONTENTS"):
+        from efi.integrity import validate_inject_kext
+
+        if validate_inject_kext(kext_dir).ok:
+            return "REAL"
     return "INVALID"
 
 

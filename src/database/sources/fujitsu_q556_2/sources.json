@@ -192,6 +192,19 @@
       "notes": "Riepilogo componenti + fonti + sha256 (provenance ledger)."
     },
     {
+      "id": "usb_map",
+      "kind": "generated",
+      "required": false,
+      "optional_group": "usb_mapping",
+      "target": "OC/Kexts/USBMap_Q5562.kext",
+      "provenance": "verified",
+      "source": {
+        "type": "generated",
+        "generator": "usb_map"
+      },
+      "notes": "Mappa USB generata automaticamente dalla detection del controller XHCI (sysfs su Linux): inject-kext USBMap con porte rilevate. Bozza: i tipi connettore vanno verificati dopo l'installazione. Se il controller non e' rilevabile il componente viene scartato, mai inventato. Si include con --usb-map."
+    },
+    {
       "id": "nvmefix",
       "kind": "kext",
       "required": false,

@@ -37,7 +37,7 @@ OPTIONAL_GROUPS = (
     "optional_drivers",
     "usb_mapping",
 )
-GENERATORS = ("config.plist", "readme", "provenance")
+GENERATORS = ("config.plist", "readme", "provenance", "usb_map")
 
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 

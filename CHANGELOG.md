@@ -67,6 +67,28 @@ dichiarativo (JSON) che un algoritmo di generazione consuma passo passo:
   -> `verified`; OpenIntelWireless (wifi/bluetooth opzionali) resta
   `default` in attesa di conferma.
 
+### Aggiunto — USB mapping automatico (`src/usb_mapping/`)
+
+- **Detection dei controller XHCI** via sysfs (Linux): classe PCI 0x0c0330,
+  PCI ID, slot in formato `pcidebug` e **conteggio reale dei porti** dal
+  root hub (oggetti `usbN-portM`). Radice sysfs iniettabile -> testabile su
+  albero finto, nessuna dipendenza dall'hardware reale. Su Windows/macOS la
+  topologia non e' rilevabile: la mappa NON viene generata (mai inventata).
+- **Generazione inject-kext USBMap** nel formato canonico
+  (personalita' `AppleUSBHostMergeProperties`, `port-count`, dizionario
+  `ports` con `UsbConnector`/`port`), con metadati OpenHackintosh che
+  dichiarano lo stato DRAFT: i tipi connettore vanno verificati dopo
+  l'installazione.
+- **Validazione inject-kext** (`validate_inject_kext`): un bundle solo
+  Info.plist (come i veri USBMap.kext) e' legittimo se ha IOKitPersonalities
+  non vuote e bundle identifier; il validator dell'EFI ora lo accetta. Un
+  bundle vuoto/placeholder resta INVALID.
+- **Integrazione nel sources engine**: componente `usb_map` nel manifest del
+  Q556/2 (opzionale, gruppo `usb_mapping`), generato PRIMA di config.plist
+  cosi' finisce in Kernel/Add e nello ZIP. Se nessun controller e'
+  rilevabile il componente viene scartato e la build resta VALID.
+- **CLI**: `generate --usb-map` (engine manifest).
+
 ### Rimosso
 
 - **Le 5 EFI "sample" in `releases/`** (`EFI-Q5562-*.zip`): contenevano
@@ -85,7 +107,7 @@ dichiarativo (JSON) che un algoritmo di generazione consuma passo passo:
 
 - [x] Algoritmo di generazione dichiarativa + sources manifest + test
 - [x] Fonti pinnate RELEASE-only per il Q556/2 (repo + tag verificati; sha256 alla prima build su rete completa)
-- [ ] USB mapping automatico
+- [x] USB mapping automatico (v1: detection XHCI + inject-kext USBMap)
 - [ ] Sources engine come motore di default + release 2.0.2 Stable in `releases/`
 - [ ] (Valutazione post-2.0.2) Layer AI opzionale con chiave API esterna: spiegazioni + analisi supporto macchina
 

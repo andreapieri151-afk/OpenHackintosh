@@ -179,6 +179,44 @@ def validate_kext(kext_dir: Path) -> ValidationResult:
     )
 
 
+def validate_inject_kext(kext_dir: Path) -> ValidationResult:
+    """Validazione di un inject-kext: bundle SOLO Info.plist, senza eseguibile.
+
+    E' la forma legittima di USBMap.kext e simili: personalita' IOKit che
+    fanno merge di proprieta', niente codice. Richiede un Info.plist valido
+    con IOKitPersonalities non vuote.
+    """
+    if not kext_dir.exists():
+        return ValidationResult(False, "MISSING", {"path": str(kext_dir)})
+    if not kext_dir.is_dir() or not kext_dir.name.endswith(".kext"):
+        return ValidationResult(False, "NOT_A_KEXT_BUNDLE", {"path": str(kext_dir)})
+
+    info_plist = kext_dir / "Contents" / "Info.plist"
+    if not info_plist.exists() or info_plist.stat().st_size < 50:
+        return ValidationResult(False, "MISSING_OR_EMPTY_INFO_PLIST", {"bundle": kext_dir.name})
+    if looks_placeholder(info_plist):
+        return ValidationResult(False, "PLACEHOLDER", {"bundle": kext_dir.name})
+
+    try:
+        import plistlib
+
+        with open(info_plist, "rb") as fh:
+            info = plistlib.load(fh)
+    except Exception as exc:
+        return ValidationResult(False, "INVALID_PLIST", {"bundle": kext_dir.name, "error": str(exc)})
+
+    personalities = info.get("IOKitPersonalities")
+    if not isinstance(personalities, dict) or not personalities:
+        return ValidationResult(False, "NO_IOKIT_PERSONALITIES", {"bundle": kext_dir.name})
+    if not info.get("CFBundleIdentifier"):
+        return ValidationResult(False, "NO_BUNDLE_IDENTIFIER", {"bundle": kext_dir.name})
+
+    return ValidationResult(True, "", {
+        "bundle": kext_dir.name,
+        "personalities": len(personalities),
+    })
+
+
 def validate_efi_binary(path: Path) -> ValidationResult:
     """Validazione binario EFI (driver, OpenCore.efi, BOOTx64.efi)."""
     if not path.exists():

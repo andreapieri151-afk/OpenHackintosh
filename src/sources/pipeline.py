@@ -23,9 +23,11 @@ from typing import Callable, Dict, List, Optional
 
 from database import HardwareProfile
 from efi.audit import final_audit
+from efi.integrity import sha256_file
 from efi.selection import ComponentSelection, DRIVER_FILES, KEXT_BUNDLES
 from efi_builder.config_generator import generate_config, save_config
 from efi_builder.smbios import generate_smbios
+from usb_mapping import detect_usb_controllers, save_usb_map_kext
 
 from .loader import ManifestError, check_against_profile
 from .resolver import (
@@ -149,6 +151,39 @@ def _generated_readme(profile: HardwareProfile, macos_version: str, smbios_model
     return "\n".join(lines)
 
 
+def _generate_usb_map(comp, profile: HardwareProfile, efi_root: Path,
+                      output_dir: Path) -> MaterializedComponent:
+    """Genera l'inject-kext della mappa USB dalla detection del controller XHCI."""
+    result = MaterializedComponent(
+        component_id=comp.id, kind=comp.kind, target=comp.target,
+        scope=comp.scope, required=comp.required, provenance=comp.provenance,
+        status=FAILED,
+    )
+
+    controllers = detect_usb_controllers()
+    if not controllers:
+        result.reason = ("nessun controller USB XHCI rilevabile su questa piattaforma: "
+                         "mappa USB non generata (mai inventata)")
+        return result
+
+    base = efi_root if comp.scope == "efi" else Path(output_dir)
+    bundle_dir = base / comp.target
+    try:
+        info_plist = save_usb_map_kext(controllers, bundle_dir, profile.id)
+    except Exception as exc:
+        result.reason = f"errore nella scrittura della mappa USB: {exc}"
+        return result
+
+    total_ports = sum(c.port_count for c in controllers)
+    result.status = OK
+    result.path = str(bundle_dir)
+    result.size = info_plist.stat().st_size
+    result.sha256 = sha256_file(info_plist)
+    result.source_url = (f"generated:usb_map ({len(controllers)} controller XHCI, "
+                         f"{total_ports} porte rilevate)")
+    return result
+
+
 def run_manifest_pipeline(
     manifest: SourcesManifest,
     profile: HardwareProfile,
@@ -162,6 +197,7 @@ def run_manifest_pipeline(
     include_nvme: bool = False,
     include_restrict_events: bool = False,
     include_optional_drivers: bool = False,
+    include_usb_mapping: bool = False,
     generate_zip: bool = True,
     dev: bool = False,
     log: Optional[Callable[[str], None]] = None,
@@ -202,19 +238,16 @@ def run_manifest_pipeline(
         include_nvme=include_nvme,
         include_restrict_events=include_restrict_events,
         include_optional_drivers=include_optional_drivers,
+        include_usb_mapping=include_usb_mapping,
     )
     chosen = _select_components(manifest, flags)
 
-    # 2. Materializzazione di ogni componente dichiarato.
+    # 2. Materializzazione di ogni componente dichiarato (non i generated:
+    #    quelli li produce il motore nella fase 3, nell'ordine giusto).
     materialized: List[MaterializedComponent] = []
     failed_required: List[str] = []
     for comp in chosen:
         if comp.kind == "generated":
-            materialized.append(MaterializedComponent(
-                component_id=comp.id, kind=comp.kind, target=comp.target,
-                scope=comp.scope, status=GENERATED, required=comp.required,
-                provenance=comp.provenance,
-            ))
             continue
         say(f"  -> {comp.id} ({comp.target})")
         result = materialize_component(comp, fetcher, out, efi_root, fetch_context)
@@ -229,6 +262,54 @@ def run_manifest_pipeline(
             result.reason = f"opzionale scartato: {result.reason}"
         materialized.append(result)
 
+    # 3. Componenti generati dal motore. config.plist va generata PER ULTIMA:
+    #    legge la cartella Kexts/ACPI/Drivers e deve vedere anche cio' che
+    #    viene prodotto qui (es. l'inject-kext della mappa USB).
+    smbios_data = generate_smbios(smbios_model)
+    generated = [c for c in chosen if c.kind == "generated"]
+    generated.sort(key=lambda c: (c.source.generator == "config.plist", c.id))
+
+    for comp in generated:
+        generator = comp.source.generator
+        if generator == "config.plist":
+            config = generate_config(
+                efi_root=efi_root,
+                smbios_data=smbios_data,
+                profile_name=profile.id,
+                audio_layout=audio_layout,
+                macos_version=macos_version,
+                device_properties=profile.device_properties,
+                dev=dev,
+            )
+            save_config(config, efi_root / "OC" / "config.plist")
+            say("  -> OC/config.plist (generato)")
+            materialized.append(MaterializedComponent(
+                component_id=comp.id, kind=comp.kind, target=comp.target,
+                scope=comp.scope, status=GENERATED, required=comp.required,
+                provenance=comp.provenance,
+                path=str(efi_root / "OC" / "config.plist"),
+            ))
+        elif generator == "usb_map":
+            say(f"  -> {comp.id} ({comp.target})")
+            result = _generate_usb_map(comp, profile, efi_root, out)
+            if result.status == OK:
+                say(f"     OK  [{result.source_url}]")
+            elif comp.required:
+                say(f"     FAIL {result.reason}")
+                failed_required.append(f"{comp.id}: {result.reason}")
+            else:
+                say(f"     SKIP (opzionale): {result.reason}")
+                result.status = SKIPPED
+                result.reason = f"opzionale scartato: {result.reason}"
+            materialized.append(result)
+        else:
+            # readme/provenance/altro: il file viene scritto piu' avanti.
+            materialized.append(MaterializedComponent(
+                component_id=comp.id, kind=comp.kind, target=comp.target,
+                scope=comp.scope, status=GENERATED, required=comp.required,
+                provenance=comp.provenance,
+            ))
+
     if failed_required:
         return {
             "success": False,
@@ -238,20 +319,6 @@ def run_manifest_pipeline(
             "efi_status": "FAILED",
             "components": [m.to_dict() for m in materialized],
         }
-
-    # 3. Componenti generati dal motore (config.plist, README, provenance).
-    smbios_data = generate_smbios(smbios_model)
-    config = generate_config(
-        efi_root=efi_root,
-        smbios_data=smbios_data,
-        profile_name=profile.id,
-        audio_layout=audio_layout,
-        macos_version=macos_version,
-        device_properties=profile.device_properties,
-        dev=dev,
-    )
-    save_config(config, efi_root / "OC" / "config.plist")
-    say("  -> OC/config.plist (generato)")
 
     readme = _generated_readme(profile, macos_version, smbios_model, materialized)
     (out / "README_EFI.txt").write_text(readme, encoding="utf-8")

@@ -79,6 +79,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_gen.add_argument("--include-nvme", action="store_true", help="Includi kext opzionale NVMeFix")
     p_gen.add_argument("--include-restrict-events", action="store_true", help="Includi kext opzionale RestrictEvents")
     p_gen.add_argument("--include-optional-drivers", action="store_true", help="Includi driver opzionali del profilo")
+    p_gen.add_argument("--usb-map", action="store_true",
+                       help="Genera la mappa USB automatica (inject-kext USBMap, engine manifest)")
     p_gen.add_argument("--engine", choices=["legacy", "manifest"], default="legacy",
                        help="legacy: builder storico; manifest: sources engine v1 (2.0.2, database delle fonti)")
     p_gen.add_argument("--manifest", default=None, help="Percorso sources manifest custom (implica --engine manifest)")

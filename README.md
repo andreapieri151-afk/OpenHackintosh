@@ -169,7 +169,19 @@ cd cartella_estratta
 ./openhackintosh sources show --profile fujitsu_q556_2
 ./openhackintosh sources check --profile fujitsu_q556_2
 ./openhackintosh generate --engine manifest --profile fujitsu_q556_2
+
+# USB mapping automatico (2.0.2): inject-kext USBMap dalla detection XHCI
+./openhackintosh generate --engine manifest --profile fujitsu_q556_2 --usb-map
 ```
+
+### USB mapping automatico (2.0.2)
+
+Con `--usb-map` il sources engine rileva il controller USB XHCI (Linux/sysfs)
+e genera `OC/Kexts/USBMap_Q5562.kext` — un inject-kext nel formato canonico
+(port-count + porte rilevate). La mappa è dichiarata **bozza**: il conteggio
+porte è misurato davvero, ma i tipi connettore vanno verificati dopo
+l'installazione. Se il controller non è rilevabile (Windows/macOS) il
+componente viene scartato: la mappa non viene mai inventata.
 
 Tutte le opzioni sono visibili con `./openhackintosh --help`.
 
@@ -280,8 +292,8 @@ Tutti da GitHub ufficiale, validati (Mach-O) prima di entrare nell'EFI.
 - [x] EFI validator avanzato (0-byte / placeholder / missing / config consistency)
 - [x] Test automatici base (pytest)
 - [x] Sources engine v1: database dichiarativo file+fonti + algoritmo di generazione (`src/sources/`, `generate --engine manifest`)
-- [ ] Conferma e pin delle fonti GitHub (repo/tag/sha256) per il Q556/2 — 2.0.2
-- [ ] USB mapping automatico — 2.0.2
+- [x] Fonti pinnate RELEASE-only per il Q556/2 (repo/tag verificati; sha256 alla prima build su rete completa)
+- [x] USB mapping automatico (`generate --usb-map`, inject-kext USBMap) — 2.0.2
 - [ ] **Nuovi dispositivi nei prossimi giorni** (Q558, Q958, Lenovo Tiny, HP Mini, Dell Micro)
 - [ ] macserial nativo per seriali più furbi
 - [ ] Creazione chiavetta installer automatica
