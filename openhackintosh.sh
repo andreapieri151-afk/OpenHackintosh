@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# OpenHackintosh 2.0.2 Beta 1 — Linux launcher
+# OpenHackintosh 2.0.2 Stable — Linux launcher
 # Stesso comportamento del launcher macOS, ma pensato per Linux.
 
 cd "$(dirname "$0")" || exit 1

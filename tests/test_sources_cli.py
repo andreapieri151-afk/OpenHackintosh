@@ -65,8 +65,43 @@ def test_generate_parser_accepts_manifest_engine():
     assert args2.manifest == "x/sources.json"
 
 
-def test_generate_parser_default_engine_legacy():
+def test_generate_parser_default_engine_manifest():
+    """Dalla 2.0.2 il motore di default e' il sources engine."""
     parser = build_parser()
     args = parser.parse_args(["generate"])
-    assert args.engine == "legacy"
+    assert args.engine == "manifest"
     assert args.manifest is None
+
+
+def test_resolve_engine_manifest_for_q556():
+    from cli.commands.generate import _resolve_engine
+
+    parser = build_parser()
+    args = parser.parse_args(["generate", "--profile", "fujitsu_q556_2"])
+    assert _resolve_engine(args, "fujitsu_q556_2") == "manifest"
+
+
+def test_resolve_engine_fallback_legacy_without_manifest():
+    """Profilo senza sources manifest (es. q957) -> fallback legacy, mai crash."""
+    from cli.commands.generate import _resolve_engine
+
+    parser = build_parser()
+    args = parser.parse_args(["generate", "--profile", "fujitsu_q957"])
+    assert _resolve_engine(args, "fujitsu_q957") == "legacy"
+
+
+def test_resolve_engine_explicit_legacy():
+    from cli.commands.generate import _resolve_engine
+
+    parser = build_parser()
+    args = parser.parse_args(["generate", "--engine", "legacy"])
+    assert _resolve_engine(args, "fujitsu_q556_2") == "legacy"
+
+
+def test_resolve_engine_explicit_manifest_path_wins():
+    from cli.commands.generate import _resolve_engine
+
+    parser = build_parser()
+    args = parser.parse_args(["generate", "--manifest", "x/sources.json",
+                              "--engine", "legacy"])
+    assert _resolve_engine(args, "fujitsu_q957") == "manifest"

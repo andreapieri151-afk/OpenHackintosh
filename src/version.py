@@ -9,4 +9,4 @@ nei loro banner viene aggiornato a ogni release insieme a questo file.
 VERSION = "2.0.2"
 
 #: Etichetta completa per l'utente. Es. "2.0.1 Stable" oppure "2.0.2 Beta 1".
-VERSION_LABEL = "2.0.2 Beta 1"
+VERSION_LABEL = "2.0.2 Stable"

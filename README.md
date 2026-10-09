@@ -14,7 +14,7 @@ Così l'ho riscritto da zero, ma **per bene**. Con file veri scaricati da GitHub
 
 **Ora supporta Q556/2 e Q957, e nei prossimi giorni aggiungerò altri dispositivi** - mini PC, laptop, desktop Skylake/Kaby Lake/Coffee Lake. Se hai un PC e vuoi che lo supporti, apri una issue con il modello e lo aggiungo.
 
-> ℹ️ **Versione attuale: OpenHackintosh 2.0.2 Beta 1** — gira su **Windows, Linux e macOS**, con rilevamento hardware completo su Windows e Linux. Novità: il **sources engine v1** (`generate --engine manifest`), che genera la EFI da un database dichiarativo di file e fonti (`openhackintosh sources show --profile fujitsu_q556_2`). Il supporto ai singoli modelli di PC resta però da verificare sul campo: non aspettarti che ogni PC booti al primo colpo; testa e apri issue con i log.
+> ℹ️ **Versione attuale: OpenHackintosh 2.0.2 Stable** — gira su **Windows, Linux e macOS**, con rilevamento hardware completo su Windows e Linux. Il motore di generazione ora e' il **sources engine v1**: la EFI nasce dal database dichiarativo di file e fonti (`src/database/sources/<profilo>/sources.json`, solo build RELEASE ufficiali, mai DEBUG, mai file finti) e include l'**USB mapping automatico** (`--usb-map`). I profili senza manifest usano ancora il builder legacy. Il supporto ai singoli modelli di PC resta da verificare sul campo: non aspettarti che ogni PC booti al primo colpo; testa e apri issue con i log.
 
 ---
 
@@ -100,7 +100,7 @@ Requisiti: **Python 3.9+** e connessione a Internet (i componenti EFI si scarica
 
 ### 1. Windows — doppio click
 
-1. **Download** dello ZIP della release (`OpenHackintosh-2.0.1.zip`, in `releases/`)
+1. **Download** dello ZIP della release (`OpenHackintosh-2.0.2.zip`, in `releases/`)
 2. **Extract**
 3. **Doppio click su `OpenHackintosh.bat`** (o, dal Prompt dei comandi nella cartella, `OpenHackintosh.bat`)
 

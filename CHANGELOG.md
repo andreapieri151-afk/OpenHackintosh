@@ -1,12 +1,16 @@
 # Changelog - Tutte le bestemmie in ordine cronologico
 
-## 2.0.2 Beta 1 - 2026-10-09 — SOURCES ENGINE: IL DATABASE DELLE FONTI
+## 2.0.2 Stable - 2026-10-09 — SOURCES ENGINE DI DEFAULT + USB MAPPING
 
-La 2.0.2 introduce il **sources engine v1**: i file della EFI e le fonti da
-cui scaricarli non sono più hardcoded nel builder, ma vivono in un database
+La 2.0.2 cambia il cuore del tool: i file della EFI e le fonti da cui
+scaricarli non sono più hardcoded nel builder, ma vivono in un database
 dichiarativo (JSON) che un algoritmo di generazione consuma passo passo:
 
     Sources Manifest -> FETCH -> VERIFY -> ASSEMBLE -> AUDIT -> ZIP
+
+Dalla 2.0.2 Stable il sources engine e' il **motore di default** di
+`generate` (`--engine legacy` per il builder storico). I profili senza
+sources manifest (es. fujitsu_q957) ripiegano su legacy automaticamente.
 
 ### Aggiunto — sources engine v1 (`src/sources/`)
 
@@ -103,13 +107,18 @@ dichiarativo (JSON) che un algoritmo di generazione consuma passo passo:
   invisibile finché si importava `hardware` prima di `database`; il sources
   engine lo avrebbe attivato.
 
-### Roadmap 2.0.2 (in corso)
+### Cambiato
 
-- [x] Algoritmo di generazione dichiarativa + sources manifest + test
-- [x] Fonti pinnate RELEASE-only per il Q556/2 (repo + tag verificati; sha256 alla prima build su rete completa)
-- [x] USB mapping automatico (v1: detection XHCI + inject-kext USBMap)
-- [ ] Sources engine come motore di default + release 2.0.2 Stable in `releases/`
-- [ ] (Valutazione post-2.0.2) Layer AI opzionale con chiave API esterna: spiegazioni + analisi supporto macchina
+- **Sources engine come motore di default** di `generate`: il builder legacy
+  resta disponibile con `--engine legacy` e come fallback automatico per i
+  profili senza manifest.
+- Versione: `2.0.2 Stable`; release `releases/OpenHackintosh-2.0.2.zip`.
+
+### Roadmap post-2.0.2
+
+- [ ] Pin sha256 dei binari nel manifest (richiede accesso al CDN release GitHub)
+- [ ] Sources manifest per altri profili (Q957, Lenovo Tiny, HP Mini, Dell Micro...)
+- [ ] (Valutazione) Layer AI opzionale con chiave API esterna (es. Gemini via AI Studio): spiegazioni + analisi supporto macchina. Mai senza chiave, mai decisionale sulla compatibilita'.
 
 ## 2.0.1 Stable - 2026-09-19 — WINDOWS + LINUX, FINE DELLA BETA
 
