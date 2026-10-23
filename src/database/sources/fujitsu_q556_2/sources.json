@@ -48,9 +48,14 @@
         "repo": "acidanthera/OpenCorePkg",
         "tag": "1.0.8",
         "asset": "OpenCore-*-RELEASE.zip",
-        "path_in_archive": "X64/EFI/OC/Drivers/HfsPlus.efi"
+        "path_in_archive": [
+          "X64/EFI/OC/Drivers/HfsPlus.efi",
+          "X64/EFI/OC/Drivers/OpenHfsPlus.efi",
+          "X64/EFI/OC/Drivers/HfsPlusLegacy.efi",
+          "X64/EFI/OC/Drivers/*HfsPlus*.efi"
+        ]
       },
-      "notes": "Driver HFS+ per leggere il volume di avvio macOS."
+      "notes": "Driver HFS+ per leggere il volume di avvio macOS. OpenCorePkg 1.0.8 non include piu' HfsPlus.efi proprietario: si usa OpenHfsPlus.efi (open source, incluso nel pacchetto)."
     },
     {
       "id": "openruntime",

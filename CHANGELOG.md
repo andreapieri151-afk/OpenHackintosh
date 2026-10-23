@@ -1,5 +1,39 @@
 # Changelog - Tutte le bestemmie in ordine cronologico
 
+## 2.0.3 Stable - 2026-10-09 — HOTFIX WINDOWS (menu loop + HfsPlus + UX)
+
+Release di correzione: tre bug segnalati dal test su macchina reale Windows,
+nessuna nuova funzionalità.
+
+### Fix
+- **Menu: il tool usciva dopo ogni comando** — ora `interactive_main` gira
+  in loop: esegue il comando scelto, attende un tasto e torna al menu
+  principale, finché non si sceglie "Exit" (o EOF/Ctrl+C). Ctrl+C durante un
+  comando non uccide più il tool: riporta al menu. Su stdin non-TTY
+  (pipe/CI) il comportamento resta identico (`echo 8 | ./openhackintosh`).
+- **EFI generation falliva su `hfsplus`** — OpenCorePkg 1.0.8 non include
+  più `X64/EFI/OC/Drivers/HfsPlus.efi` (il driver proprietario Apple non è
+  redistribuibile nel pacchetto): il manifest ora dichiara una lista di path
+  candidati (`HfsPlus.efi` → `OpenHfsPlus.efi` → `HfsPlusLegacy.efi`) e il
+  resolver usa il primo che esiste nell'archivio. Il file viene comunque
+  materializzato in `OC/Drivers/HfsPlus.efi`; il campo `resolved` del ledger
+  registra quale membro dell'archivio è stato usato davvero. Se nessun
+  candidato esiste, l'errore elenca i driver `.efi` presenti nell'archivio
+  per diagnosi immediata.
+- **UX menu** — in modalità raw i tasti non hanno eco: la selezione numerica
+  "agiva senza mostrare nulla". Ora ogni selezione (numero o frecce+Invio)
+  mostra la riga di conferma `✔ N. Label` prima di eseguire il comando.
+
+### Tecnico
+- `sources.schema`: `path_in_archive` accetta stringa o lista di candidati.
+- `sources.resolver`: ricerca multi-candidato + `_archive_hint` diagnostico +
+  campo `resolved` in `MaterializedComponent`.
+- `cli.main`: loop del menu + `_pause_before_menu()` (no-op fuori da TTY).
+- `cli.selector`: `_draw_choice_feedback()` dopo ogni SELECTED.
+- Test: `tests/test_fixes_203.py` (14 casi: fallback HfsPlus, diagnosi
+  archivio, loop del menu, pausa, Ctrl+C, feedback visibile).
+- Versione: `2.0.3 Stable`; release `releases/OpenHackintosh-2.0.3.zip`.
+
 ## 2.0.2 Stable - 2026-10-09 — SOURCES ENGINE DI DEFAULT + USB MAPPING
 
 La 2.0.2 cambia il cuore del tool: i file della EFI e le fonti da cui
