@@ -57,24 +57,29 @@ class SourceSpec:
     repo: str = ""
     tag: str = "latest"           # "latest" oppure una versione fissata (es. "1.0.8")
     asset: str = ""               # pattern fnmatch sul nome asset (es. "OpenCore-*-RELEASE.zip")
-    path_in_archive: str = ""     # path/glob dentro lo zip (solo file singoli)
+    #: Percorso/glob dentro lo zip. Puo' essere una lista di candidati,
+    #: provati in ordine (es. HfsPlus.efi e' stato rinominato tra le versioni
+    #: di OpenCorePkg: il primo che esiste vince).
+    path_in_archive: List[str] = field(default_factory=list)
     # github_raw
     ref: str = ""                 # branch/tag/commit per raw.githubusercontent.com
     path: str = ""                # path nel repo
     # url
     url: str = ""
     # generated
-    generator: str = ""           # config.plist | readme | provenance
+    generator: str = ""           # config.plist | readme | provenance | usb_map
 
     def to_dict(self) -> Dict[str, Any]:
         d = asdict(self)
-        return {k: v for k, v in d.items() if v not in ("", None)}
+        d["path_in_archive"] = list(self.path_in_archive)
+        return {k: v for k, v in d.items() if v not in ("", None, [])}
 
     def summary(self) -> str:
         """Descrizione breve e leggibile della fonte."""
         if self.type == "github_release":
             tag = "@" + self.tag if self.tag and self.tag != "latest" else "@latest"
-            return f"github:{self.repo}{tag} :: {self.asset or '*'}"
+            where = self.path_in_archive[0] if self.path_in_archive else "*"
+            return f"github:{self.repo}{tag} :: {self.asset or '*'} :: {where}"
         if self.type == "github_raw":
             return f"raw:{self.repo}@{self.ref}/{self.path}"
         if self.type == "url":
@@ -165,12 +170,23 @@ def _validate_source(raw: Any, ctx: str) -> tuple:
         repo=str(raw.get("repo", "")),
         tag=str(raw.get("tag", "latest")),
         asset=str(raw.get("asset", "")),
-        path_in_archive=str(raw.get("path_in_archive", "")),
         ref=str(raw.get("ref", "")),
         path=str(raw.get("path", "")),
         url=str(raw.get("url", "")),
         generator=str(raw.get("generator", "")),
     )
+
+    # path_in_archive: stringa singola o lista di candidati.
+    pia = raw.get("path_in_archive", "")
+    if isinstance(pia, str):
+        spec.path_in_archive = [pia] if pia else []
+    elif isinstance(pia, list) and pia and all(isinstance(p, str) and p for p in pia):
+        spec.path_in_archive = list(pia)
+    else:
+        errors.append(
+            f"{ctx}.source: path_in_archive deve essere una stringa o una lista "
+            f"non vuota di stringhe"
+        )
 
     if stype == "github_release":
         if not spec.repo or "/" not in spec.repo:

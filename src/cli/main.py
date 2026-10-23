@@ -173,20 +173,62 @@ MENU_COMMANDS = {
 
 
 def interactive_main(out: Out) -> None:
-    items: List[dict] = [dict(item) for item in MENU_ITEMS]
-    choice = run_menu(items)
-    if choice is None or choice.get("action") == "exit":
-        return
+    """Menu interattivo: esegue il comando scelto e POI torna al menu.
 
-    # Esegue la stessa logica dei sottocomandi
-    parser = build_parser()
-    argv = list(MENU_COMMANDS.get(choice["action"], ["doctor"]))
-    if out.json_output:
-        argv.append("--json")
-    if out.dev:
-        argv.append("--dev")
-    args = parser.parse_args(argv)
-    run_command(args, parser, Out(json_output=out.json_output, dev=out.dev))
+    Il loop continua finche' non si sceglie "Exit" (o arriva EOF su stdin non
+    interattivo). Dopo ogni comando attende un tasto prima di ridisegnare il
+    menu, cosi' l'output resta leggibile. Ctrl+C durante un comando non
+    uccide il tool: riporta al menu.
+    """
+    while True:
+        items: List[dict] = [dict(item) for item in MENU_ITEMS]
+        choice = run_menu(items)
+        if choice is None or choice.get("action") == "exit":
+            return
+
+        # Esegue la stessa logica dei sottocomandi
+        parser = build_parser()
+        argv = list(MENU_COMMANDS.get(choice["action"], ["doctor"]))
+        if out.json_output:
+            argv.append("--json")
+        if out.dev:
+            argv.append("--dev")
+        args = parser.parse_args(argv)
+        try:
+            run_command(args, parser, Out(json_output=out.json_output, dev=out.dev))
+        except KeyboardInterrupt:
+            print("\nInterrotto dall'utente.")
+
+        if not _pause_before_menu():
+            return
+
+
+def _pause_before_menu() -> bool:
+    """Attende un tasto prima di ridisegnare il menu. Ritorna False per uscire.
+
+    Fuori da un TTY (pipe, CI) ritorna subito: in quel caso il menu
+    line-based legge la riga successiva da solo.
+    """
+    from .selector import KEY_CTRL_C, KEY_ESC, is_interactive, make_key_reader
+
+    if not is_interactive():
+        return True
+    print("\n" + "-" * 62)
+    print("Comando completato. Premi un tasto per tornare al menu (q/ESC per uscire).")
+    try:
+        reader = make_key_reader()
+        with reader:
+            while True:
+                key = reader.read_key()
+                if key is None:
+                    return True
+                if key in (KEY_ESC, KEY_CTRL_C, "q", "Q"):
+                    return False
+                return True
+    except KeyboardInterrupt:
+        return False
+    except (OSError, ValueError):
+        return True
 
 
 def run_command(args, parser, out: Out) -> int:

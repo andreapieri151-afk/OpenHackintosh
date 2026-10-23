@@ -637,6 +637,29 @@ def _clear_lines(count: int, stream) -> None:
     stream.write("\r")
 
 
+#: Quanto resta visibile la riga di conferma dopo una selezione.
+CHOICE_FEEDBACK_DELAY = 0.5
+
+
+def _draw_choice_feedback(stream, items: Sequence[dict], index: int,
+                          drawn: int, ansi: bool) -> None:
+    """Sostituisce il menu con la riga di conferma ``✔ N. Label``.
+
+    In modalita' raw la pressione dei tasti non ha eco sul terminale: senza
+    questo feedback una selezione numerica sembra "non fare nulla" (il tasto
+    agisce ma non si vede). La riga di conferma rende la scelta visibile su
+    ogni piattaforma, con o senza ANSI.
+    """
+    num_width = len(str(len(items)))
+    label = str(items[index].get("label", ""))
+    line = f"\u2714 {str(index + 1).rjust(num_width)}. {label}"
+    if ansi and drawn:
+        _clear_lines(drawn, stream)
+    stream.write(line + "\n")
+    stream.flush()
+    time.sleep(CHOICE_FEEDBACK_DELAY)
+
+
 # --------------------------------------------------------------------------
 # Loop principale del selettore
 # --------------------------------------------------------------------------
@@ -713,7 +736,9 @@ def select_interactive(
             result = state.feed(key)
 
             if result.status == SELECTED:
-                return result.index
+                idx = result.index if result.index is not None else 0
+                _draw_choice_feedback(stdout, items, idx, drawn, ansi)
+                return idx
             if result.status == CANCELLED:
                 return None
             if result.status == INTERRUPTED:

@@ -49,6 +49,8 @@ class MaterializedComponent:
     source_url: str = ""
     provenance: str = "default"
     required: bool = True
+    #: Membro dell'archivio effettivamente usato (utile con i path candidati).
+    resolved: str = ""
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -57,6 +59,33 @@ class MaterializedComponent:
 def _extract_member(zf: zipfile.ZipFile, member: str) -> bytes:
     with zf.open(member) as fh:
         return fh.read()
+
+
+def _archive_hint(zf: zipfile.ZipFile, patterns: List[str], wanted: str) -> str:
+    """Suggerimento diagnostico: elenca i file simili presenti nell'archivio.
+
+    Utile quando una versione upstream rinomina o sposta un file (es. il
+    driver HFS+ di OpenCorePkg): l'errore mostra cosa c'e' davvero dentro.
+    """
+    names = zf.namelist()
+    # 1) file con lo stesso basename (case-insensitive) in altre cartelle
+    same_base = sorted(
+        n for n in names
+        if n.lower().endswith(wanted.lower()) and not n.endswith("/")
+    )
+    # 2) se il target e' un driver, elenca tutti i driver .efi presenti
+    drivers = sorted(
+        n for n in names
+        if "/Drivers/" in n.replace("\\", "/") and n.lower().endswith(".efi")
+    )
+    hints: List[str] = []
+    if same_base:
+        hints.append("file con lo stesso nome trovati altrove: " + ", ".join(same_base[:6]))
+    if drivers:
+        hints.append("driver .efi presenti nell'archivio: " + ", ".join(drivers[:8]))
+    if not hints:
+        hints.append(f"contenuto campione dell'archivio: {', '.join(names[:8])}")
+    return " (" + "; ".join(hints) + ")"
 
 
 def _find_single_file(zf: zipfile.ZipFile, pattern: str) -> Optional[str]:
@@ -129,11 +158,21 @@ def materialize_component(component: ComponentSpec, fetcher, output_dir: Path,
             result.source_url = component.source.summary()
             with zipfile.ZipFile(archive_path) as zf:
                 if component.kind == "efi_binary":
-                    pattern = component.source.path_in_archive or ("*/" + dest.name)
-                    member = _find_single_file(zf, pattern)
+                    # Il manifest puo' dichiarare una lista di path candidati
+                    # (prova in ordine): il primo che esiste nell'archivio
+                    # vince. Serve quando l'upstream rinomina un file tra le
+                    # versioni (es. driver HFS+ di OpenCorePkg in 1.0.8).
+                    patterns = [p for p in component.source.path_in_archive] or ["*/" + dest.name]
+                    member: Optional[str] = None
+                    for pattern in patterns:
+                        member = _find_single_file(zf, pattern)
+                        if member:
+                            break
                     if not member:
-                        result.reason = f"file non trovato nell'archivio: {pattern!r}"
+                        detail = _archive_hint(zf, patterns, dest.name)
+                        result.reason = f"file non trovato nell'archivio: {patterns!r}{detail}"
                         return result
+                    result.resolved = member
                     data = _extract_member(zf, member)
                     dest.parent.mkdir(parents=True, exist_ok=True)
                     dest.write_bytes(data)
